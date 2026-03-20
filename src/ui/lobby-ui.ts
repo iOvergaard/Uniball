@@ -26,6 +26,12 @@ function getRoot(): HTMLDivElement {
 
 /** Show the landing screen: create, join, or local play */
 export function showLandingScreen(callbacks: LobbyUICallbacks, roomIdFromHash?: string): void {
+  // If we have a room ID from the URL, show the streamlined join screen instead
+  if (roomIdFromHash) {
+    showJoinScreen(callbacks, roomIdFromHash);
+    return;
+  }
+
   const el = getRoot();
   el.innerHTML = `
     <div style="text-align:center;max-width:420px;width:100%;padding:24px;">
@@ -41,10 +47,7 @@ export function showLandingScreen(callbacks: LobbyUICallbacks, roomIdFromHash?: 
       <button id="btn-create" style="width:100%;padding:14px;font-size:16px;border:none;border-radius:8px;background:#e63946;color:#fff;cursor:pointer;margin-bottom:10px;font-weight:bold;">
         Create Room
       </button>
-      <button id="btn-join" style="width:100%;padding:14px;font-size:16px;border:none;border-radius:8px;background:#457b9d;color:#fff;cursor:pointer;margin-bottom:10px;font-weight:bold;${roomIdFromHash ? '' : 'display:none;'}">
-        Join Room
-      </button>
-      <div id="join-manual" style="${roomIdFromHash ? 'display:none;' : ''}margin-bottom:10px;">
+      <div style="margin-bottom:10px;">
         <input id="lobby-room-id" type="text" placeholder="Paste room link or ID"
           style="width:100%;padding:10px;font-size:14px;border-radius:6px 6px 0 0;border:1px solid #444;background:#2a2a4a;color:#fff;text-align:center;">
         <button id="btn-join-manual" style="width:100%;padding:12px;font-size:14px;border:none;border-radius:0 0 8px 8px;background:#457b9d;color:#fff;cursor:pointer;font-weight:bold;">
@@ -67,12 +70,6 @@ export function showLandingScreen(callbacks: LobbyUICallbacks, roomIdFromHash?: 
     callbacks.onCreateRoom(getName());
   });
 
-  if (roomIdFromHash) {
-    document.getElementById('btn-join')!.addEventListener('click', () => {
-      callbacks.onJoinRoom(getName(), roomIdFromHash);
-    });
-  }
-
   document.getElementById('btn-join-manual')?.addEventListener('click', () => {
     const raw = (document.getElementById('lobby-room-id') as HTMLInputElement).value.trim();
     // Extract room ID from URL or use as-is
@@ -85,6 +82,48 @@ export function showLandingScreen(callbacks: LobbyUICallbacks, roomIdFromHash?: 
 
   document.getElementById('btn-local')!.addEventListener('click', () => {
     callbacks.onLocalPlay();
+  });
+}
+
+/** Streamlined join screen shown when opening a room link */
+function showJoinScreen(callbacks: LobbyUICallbacks, roomId: string): void {
+  const el = getRoot();
+  el.innerHTML = `
+    <div style="text-align:center;max-width:420px;width:100%;padding:24px;">
+      <h1 style="font-size:48px;margin-bottom:4px;">🦄 Uniball</h1>
+      <p style="opacity:0.6;margin-bottom:32px;">You've been invited to play!</p>
+
+      <div style="margin-bottom:24px;">
+        <label style="display:block;margin-bottom:6px;opacity:0.7;font-size:14px;">Your name</label>
+        <input id="lobby-name" type="text" maxlength="12" placeholder="Unicorn"
+          style="width:100%;padding:10px;font-size:16px;border-radius:6px;border:1px solid #444;background:#2a2a4a;color:#fff;text-align:center;"
+          autofocus>
+      </div>
+
+      <button id="btn-join" style="width:100%;padding:14px;font-size:18px;border:none;border-radius:8px;background:#457b9d;color:#fff;cursor:pointer;margin-bottom:10px;font-weight:bold;">
+        Join Game
+      </button>
+      <button id="btn-back" style="width:100%;padding:10px;font-size:13px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,0.4);cursor:pointer;">
+        Back to menu
+      </button>
+    </div>
+  `;
+
+  const nameInput = document.getElementById('lobby-name') as HTMLInputElement;
+
+  function join(): void {
+    const name = nameInput.value.trim() || 'Unicorn';
+    callbacks.onJoinRoom(name, roomId);
+  }
+
+  document.getElementById('btn-join')!.addEventListener('click', join);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') join();
+  });
+
+  document.getElementById('btn-back')!.addEventListener('click', () => {
+    window.location.hash = '';
+    showLandingScreen(callbacks);
   });
 }
 

@@ -211,7 +211,7 @@ function startClientMode(playerName: string, hostPeerId: string): void {
   });
 
   client.connect(hostPeerId).catch((err) => {
-    showLobbyStatus(`Connection failed: ${err.message}`);
+    showLobbyStatus(err.message || 'Connection failed. Please try again.');
   });
 
   function loop(): void {
