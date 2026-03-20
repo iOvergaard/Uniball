@@ -234,39 +234,45 @@ interface InputFrame {
 5. **Phase 5**: Visual inspection — field lines, colors, animations, responsive scaling
 6. **Phase 6**: Close a tab mid-game, verify graceful handling
 
-## Automated Acceptance Testing Strategy
+## Testing Policy
 
-The unit tests in `engine.test.ts` validate physics and game logic in isolation. As the project grows, we need automated acceptance tests that simulate actual multiplayer gameplay end-to-end.
+**Testing is a prerequisite for all work.** No feature is complete until it has automated tests. All tests run on every PR via CI (`npm run test`).
 
-### Current: Headless Playtests (Phase 1-2)
+### Test Structure
 
-Run the physics engine with scripted inputs (no browser needed). These tests verify:
+- `src/physics/engine.test.ts` — Unit tests for physics, collisions, scoring, timer, substitutions
+- `src/test/acceptance.test.ts` — Full match simulations with bot players, invariant checks every tick
 
-- Two players moving and kicking independently
-- Full match flow: kickoff → goals → halftime → substitutions → game over
-- Edge cases: collisions, wall bounces, reserves rotating in
+### Acceptance Tests
 
-These run on every PR via CI (`npm run test`).
+Bot-driven full match simulations that exercise the entire engine end-to-end. Each test:
 
-### Next: Simulated Multiplayer (Phase 3+)
+1. Creates a game with scripted "bot" players (chase-ball, attack, idle)
+2. Runs the match for 30 seconds of game time (fast — ~13s wall time for all 16 tests)
+3. Asserts **invariants on every tick**: positions finite, players in bounds, team limits, non-negative scores/time
+4. Checks outcomes: match completes, goals scored, halftime triggers, substitutions rotate
 
-Once networking is in place, add integration tests that:
+Current acceptance coverage:
 
-- Spin up a headless host game loop
-- Connect 2+ simulated clients that send scripted `InputFrame` sequences
-- Verify that host state broadcasts arrive at clients and state converges
-- Test disconnect/reconnect scenarios (Phase 6)
+- Full match completion: 1v1, 3v3, 5v5 (with reserves), asymmetric teams
+- Goal scoring: attackers score at least 1 goal
+- Halftime: triggers once, swaps sides
+- Substitutions: reserves rotate onto field after interval
+- Ball physics: velocity bounded, Y position in bounds
+- Player collisions: overlap rate below 5%
+- Edge cases: idle players, constant kicking, diagonal movement
 
-**Approach**: Create a `test/acceptance/` directory with Vitest tests that import `game-host.ts` and `game-client.ts` directly (no browser). Mock the PeerJS transport layer with in-memory message passing so tests run fast and deterministically.
+### Per-Phase Testing Requirements
 
-### Continuous Improvement
+- **Phase 3 (Networking)**: Mock PeerJS transport with in-memory message passing. Test host→client state broadcast, client→host input round-trip, interpolation convergence.
+- **Phase 4 (Lobby)**: Simulate multiple clients joining lobby, picking teams, host starting match. Full game with 4+ simulated players.
+- **Phase 5 (Polish)**: Snapshot-test game state at key moments (goal, halftime, substitution). No visual tests.
+- **Phase 6 (Robustness)**: Disconnect mid-game triggers reserve sub-in. Host disconnect ends game for all. Reconnect within grace period resumes.
 
-Every phase should add acceptance tests alongside feature code:
+### CI Pipeline
 
-- **Phase 3**: Host broadcasts state, client receives and interpolates, input round-trip works
-- **Phase 4**: Lobby → team pick → match start → full game with 4+ simulated players
-- **Phase 5**: No automated visual tests, but snapshot-test the game state at key moments (goal scored, halftime, substitution)
-- **Phase 6**: Player disconnect mid-game triggers reserve sub-in; host disconnect ends game for all clients
+- **PR checks** (`.github/workflows/ci.yml`): format + lint + types + tests + build
+- **Deploy** (`.github/workflows/deploy.yml`): build only (checks already passed on PR)
 
 ## Estimated Size
 
