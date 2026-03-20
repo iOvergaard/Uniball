@@ -32,10 +32,34 @@ export class GameClient {
   async connect(hostPeerId: string): Promise<void> {
     this.peer = new Peer();
     return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const fail = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        // Provide a friendlier error message for common PeerJS errors
+        const msg = err.message || String(err);
+        if (msg.includes('Could not connect to peer')) {
+          reject(new Error('Room not found. The host may have closed the room.'));
+        } else if (msg.includes('Lost connection to server')) {
+          reject(new Error('Lost connection to signaling server. Check your internet.'));
+        } else {
+          reject(err);
+        }
+      };
+
+      // Timeout: if connection doesn't open within 15 seconds, fail
+      const timeout = setTimeout(() => {
+        fail(new Error('Connection timed out. The host may not be reachable.'));
+      }, 15000);
+
       this.peer!.on('open', () => {
         this.conn = this.peer!.connect(hostPeerId, { reliable: true });
 
         this.conn.on('open', () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
           this.callbacks.onConnected();
 
           this.conn!.on('data', (data) => {
@@ -53,10 +77,10 @@ export class GameClient {
           resolve();
         });
 
-        this.conn.on('error', (err) => reject(err));
+        this.conn.on('error', (err) => fail(err));
       });
 
-      this.peer!.on('error', (err) => reject(err));
+      this.peer!.on('error', (err) => fail(err));
     });
   }
 
