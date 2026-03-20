@@ -224,6 +224,9 @@ export function updateLobbyPlayers(players: LobbyPlayer[]): void {
 export function hideLobby(): void {
   root?.remove();
   root = null;
+  // Show the canvas now that the lobby is gone
+  const canvas = document.getElementById('game');
+  if (canvas) canvas.style.display = 'block';
 }
 
 /** Show a simple status message in the lobby area */
