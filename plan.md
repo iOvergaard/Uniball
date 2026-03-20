@@ -2,58 +2,57 @@
 
 ## Context
 
-We're building **Uniball**, a browser-based P2P multiplayer soccer game inspired by haxball.com, focused purely on soccer. It's a team activity where two teams of up to 5 play each other. The game uses WebRTC (via PeerJS) so one player's browser acts as the authoritative host — no traditional backend needed.
-
-The repo is currently empty (just a LICENSE file). We're building from scratch.
+We're building **Uniball**, a browser-based P2P multiplayer soccer game inspired by haxball.com, focused purely on soccer. It's a team activity where two teams of up to 7 players each compete, with a maximum of 4 on the field per team at any time. Reserve players rotate in via forced substitutions every 60 seconds. The game uses WebRTC (via PeerJS) so one player's browser acts as the authoritative host — no traditional backend needed.
 
 ## Technology Stack
 
-- **Language**: TypeScript
-- **Build tool**: Vite
+- **Language**: TypeScript (strict mode)
+- **Toolchain**: Vite+ (Vite 8, Vitest, Oxlint, Oxfmt)
 - **Networking**: PeerJS (WebRTC DataChannels) — free cloud signaling server
 - **Rendering**: HTML Canvas 2D
 - **Physics**: Custom circle-based collision (no library)
 - **Architecture**: Host/leader pattern (one peer = authoritative game server)
+- **CI/CD**: GitHub Actions → GitHub Pages
 
-## Files to Create
+## Current File Structure
 
 ### Root config files
 
 - `CLAUDE.md` — Project conventions, build/test/lint commands, links to `plan.md`
 - `plan.md` — This implementation plan for team reference
-- `package.json` — deps: `vite`, `typescript`, `peerjs`
-- `tsconfig.json` — strict, ESNext
-- `vite.config.ts` — minimal
-- `index.html` — single `<canvas>`, script tag
+- `package.json` — deps: `vite-plus`, `peerjs`
+- `vite.config.ts` — Unified Vite+ config (build, test, lint, fmt)
+- `index.html` — Single `<canvas>`, script tag
+- `.github/workflows/deploy.yml` — GitHub Pages deploy on push to main
 
 ### Source tree (`src/`)
 
 ```
 src/
-  main.ts                  — Entry point, routes between lobby and game
-  constants.ts             — All magic numbers (field size, physics, timings)
+  main.ts                  — Entry point, game loop, local sandbox
+  constants.ts             — All magic numbers (field, physics, timings, substitution)
   types.ts                 — Shared type definitions
   physics/
-    engine.ts              — Fixed-timestep simulation (the core loop)
+    engine.ts              — Fixed-timestep simulation, substitution logic
+    engine.test.ts         — Vitest test suite (22 tests)
     collision.ts           — Circle-circle and circle-wall resolution
-    field.ts               — Field geometry, goal detection, boundaries
+    field.ts               — Field geometry, goal detection, player positioning
   render/
-    renderer.ts            — Canvas 2D drawing (field, players, ball)
-    hud.ts                 — Score, timer, overlays
+    renderer.ts            — Canvas 2D drawing (field, players, ball, HUD, bench counts)
     camera.ts              — Viewport scaling / resize handling
-  net/
+  net/                     — (Phase 3) PeerJS networking
     host.ts                — Host: accept connections, broadcast state
     client.ts              — Client: send inputs, receive state, interpolate
     protocol.ts            — Binary message encoding/decoding
     lobby.ts               — Room creation, join flow, team selection
   input/
     input.ts               — Keyboard capture → InputFrame
-  game/
+  game/                    — (Phase 2-3) Separate game loops
     game-host.ts           — Host game loop: tick physics + broadcast
     game-client.ts         — Client game loop: send inputs + interpolate + render
     rules.ts               — Kickoff, halftime, goals, game-over logic
     state.ts               — GameState factory functions
-  ui/
+  ui/                      — (Phase 4) DOM-based UI
     lobby-ui.ts            — Lobby screen (create/join, team pick, player list)
     hud-ui.ts              — In-game HUD
     screens.ts             — Game-over, halftime overlays
@@ -67,7 +66,7 @@ src/
 
 - **Host** runs authoritative physics at **60 Hz** fixed timestep
 - **Clients** send input (direction + kick) to host every tick (~12 bytes)
-- **Host** broadcasts compact **state snapshots at 20 Hz** (~230 bytes for 10 players)
+- **Host** broadcasts compact **state snapshots at 20 Hz** (~230 bytes for 8 on-field players)
 - **Clients** interpolate between the two most recent snapshots for smooth 60fps rendering
 
 This avoids cross-browser floating-point determinism issues that plague lockstep.
@@ -88,10 +87,10 @@ This avoids cross-browser floating-point determinism issues that plague lockstep
 | Field | Type | Bytes |
 |-------|------|-------|
 | Header (type, seq, tick, time, scores) | mixed | 13 |
-| Per player (pos, vel, team, cooldown, id) | mixed | 20 each |
-| **Total (10 players)** | | **~230** |
+| Per player (pos, vel, team, cooldown, id, onField) | mixed | 21 each |
+| **Total (8 on-field)** | | **~181** |
 
-Bandwidth: ~4.6 KB/s per client. Negligible.
+Bandwidth: ~3.6 KB/s per client. Negligible.
 
 **Lobby messages**: Reliable JSON over a separate PeerJS DataConnection (join, team change, start game, chat).
 
@@ -103,6 +102,14 @@ All entities are circles. Top-down, no gravity, friction via damping.
 | ------ | ------ | ---- | ------------ |
 | Player | 15     | 1.0  | 0.96         |
 | Ball   | 10     | 0.5  | 0.99         |
+
+### Substitution System
+
+- Up to **14 players** total (7 per team max), **4 on field per team** at a time
+- Teams can be unequal in size (e.g. 7 red vs 3 blue)
+- Every **60 seconds**, each team with reserves performs a forced substitution
+- Rotation is FIFO: the first on-field player goes to bench, the first reserve comes on
+- After substitution, all on-field players reset to starting positions
 
 ### Player Avatars — Unicorns!
 
@@ -124,28 +131,29 @@ We'll start with the emoji approach in Phase 1-4 and can upgrade to custom sprit
 
 - **5 minutes** match, halftime at 2:30 (swap sides, teleport players)
 - **Kickoff** after each goal: players to starting positions, ball centered, 3-2-1-GO countdown
+- **Forced substitution** every 60s if team has reserves
 - **Game over** at timer=0. Tie = draw (or optional sudden death overtime)
 
 ### Lobby Flow
 
 1. Host: `new Peer()` → gets `peerId` → shareable URL `#room=<peerId>`
 2. Client: reads `room` from URL hash → `peer.connect(roomId)`
-3. Team selection in lobby (Red/Blue, max 5 per team)
+3. Team selection in lobby (Red/Blue, max 7 per team)
 4. Host clicks Start → `GameStart` message → all transition to game
 
 ## Implementation Phases
 
-### Phase 1: Scaffolding + Local Physics Sandbox
+### Phase 1: Scaffolding + Local Physics Sandbox — DONE
 
-Create Vite+TS project, physics engine, renderer, input handling. One player + ball on a field, controllable with WASD, ball bounces off walls.
+Created Vite+TS project, physics engine, renderer, input handling. One player + ball on a field, controllable with WASD, ball bounces off walls. Migrated to Vite+ toolchain (Vite 8, Vitest, Oxlint, Oxfmt). Added GitHub Pages deploy workflow.
 
-**Test**: Open browser, move player, kick ball, see it bounce. Physics feels good.
+### Phase 2: Full Local Match — IN PROGRESS
 
-### Phase 2: Full Local Match
+Added scoring, timer, kickoff countdown, halftime side swap, game-over logic. Implemented reserve player system with forced substitutions every 60 seconds (max 4 on field per team, up to 14 total players). HUD shows score, timer, and bench counts.
 
-Add multiple players, scoring, timer, kickoff, halftime, game-over. Two keyboard players (WASD vs arrows).
+**Remaining**: Second keyboard player (WASD vs arrows) for local 2-player testing.
 
-**Test**: Play a full local match. Goals register, score updates, halftime swaps sides, game ends.
+**Test**: Play a full local match. Goals register, score updates, halftime swaps sides, substitutions rotate players, game ends.
 
 ### Phase 3: Networking — Host + One Client
 
@@ -155,13 +163,13 @@ PeerJS integration. Host runs physics, client sends input and receives state. Bi
 
 ### Phase 4: Lobby + Multi-Player
 
-Full lobby UI with shareable link, team selection, player names, ready-up. Support up to 10 players.
+Full lobby UI with shareable link, team selection, player names, ready-up. Support up to 14 players (4 on field per team + reserves).
 
-**Test**: Multiple tabs join room, pick teams, host starts game, everyone plays together.
+**Test**: Multiple tabs join room, pick teams, host starts game, everyone plays together. Substitutions rotate reserves in.
 
 ### Phase 5: Visual Polish
 
-Unicorn avatar upgrades (custom SVG sprites with team colors, rotation to face movement direction, kick animation), field lines, player names above unicorns, goal flash animation, kick indicator, responsive canvas scaling, kickoff countdown overlay, halftime overlay.
+Unicorn avatar upgrades (custom SVG sprites with team colors, rotation to face movement direction, kick animation), field lines, player names above unicorns, goal flash animation, kick indicator, responsive canvas scaling, kickoff countdown overlay, halftime overlay, substitution announcement.
 
 **Test**: Game looks polished and feels fun in a group.
 
@@ -186,6 +194,7 @@ interface PlayerState {
   team: Team;
   kickCooldown: number;
   name: string;
+  onField: boolean;
 }
 interface BallState {
   position: Vec2;
@@ -202,6 +211,7 @@ interface GameState {
   players: PlayerState[];
   ball: BallState;
   halfSwapped: boolean;
+  lastSubstitutionTime: number;
 }
 interface InputFrame {
   dx: number;
@@ -213,12 +223,12 @@ interface InputFrame {
 ## Verification
 
 1. **Phase 1**: `npm run dev` → open browser → move player with WASD, kick ball with Space
-2. **Phase 2**: Two players on same keyboard, play full match with timer
+2. **Phase 2**: Two players on same keyboard, play full match with timer and substitutions
 3. **Phase 3**: Open two tabs, connect via URL hash, both control separate players
-4. **Phase 4**: Open 4+ tabs, join lobby, pick teams, start and play match
+4. **Phase 4**: Open 4+ tabs, join lobby, pick teams, start and play match with reserves
 5. **Phase 5**: Visual inspection — field lines, colors, animations, responsive scaling
 6. **Phase 6**: Close a tab mid-game, verify graceful handling
 
 ## Estimated Size
 
-~2000-2500 lines of TypeScript. Largest files: `engine.ts` (~200), `renderer.ts` (~250), `game-host.ts` (~150), `lobby-ui.ts` (~200).
+~2000-2500 lines of TypeScript. Largest files: `engine.ts` (~250), `renderer.ts` (~250), `game-host.ts` (~150), `lobby-ui.ts` (~200).
