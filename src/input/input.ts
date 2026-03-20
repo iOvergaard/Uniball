@@ -70,9 +70,15 @@ export function destroyInput(): void {
 }
 
 function initTouchControls(): () => void {
-  // Prevent default touch behaviors (scrolling, zooming)
-  const preventStart = (e: TouchEvent) => e.preventDefault();
-  const preventMove = (e: TouchEvent) => e.preventDefault();
+  const canvas = document.getElementById('game');
+
+  // Only prevent default touch on the canvas (not on UI elements like inputs/buttons)
+  const preventStart = (e: TouchEvent) => {
+    if (e.target === canvas) e.preventDefault();
+  };
+  const preventMove = (e: TouchEvent) => {
+    if (e.target === canvas) e.preventDefault();
+  };
   document.addEventListener('touchstart', preventStart, { passive: false });
   document.addEventListener('touchmove', preventMove, { passive: false });
 
