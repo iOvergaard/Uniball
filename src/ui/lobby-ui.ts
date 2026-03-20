@@ -229,10 +229,37 @@ export function hideLobby(): void {
   if (canvas) canvas.style.display = 'block';
 }
 
-/** Show a simple status message in the lobby area */
+/** Show a status/error message in the lobby area with optional back button */
 export function showLobbyStatus(text: string): void {
   const el = getRoot();
-  el.innerHTML = `<p style="font-size:20px;opacity:0.8;">${text}</p>`;
+  const isError =
+    text.includes('failed') ||
+    text.includes('not found') ||
+    text.includes("Couldn't") ||
+    text.includes('timed out') ||
+    text.includes('Rejected') ||
+    text.includes('Failed');
+
+  el.innerHTML = `
+    <div style="text-align:center;max-width:420px;width:100%;padding:24px;">
+      <h1 style="font-size:48px;margin-bottom:16px;">🦄</h1>
+      <p style="font-size:${isError ? '16' : '20'}px;opacity:0.85;line-height:1.5;margin-bottom:24px;">${escapeHtml(text)}</p>
+      ${
+        isError
+          ? `<button id="btn-status-back" style="padding:12px 32px;font-size:15px;border:none;border-radius:8px;background:#457b9d;color:#fff;cursor:pointer;font-weight:bold;">
+              Back to menu
+            </button>`
+          : ''
+      }
+    </div>
+  `;
+
+  if (isError) {
+    document.getElementById('btn-status-back')?.addEventListener('click', () => {
+      window.location.hash = '';
+      window.location.reload();
+    });
+  }
 }
 
 // --- Internal helpers ---

@@ -135,7 +135,12 @@ function startHostMode(hostName: string): void {
   });
 
   host.start().catch((err) => {
-    showLobbyStatus(`Error: ${err.message}`);
+    const msg = err.message || '';
+    if (msg.includes('server') || msg.includes('network')) {
+      showLobbyStatus('Could not reach the signaling server. Check your internet and try again.');
+    } else {
+      showLobbyStatus(`Failed to create room: ${msg}`);
+    }
   });
 }
 
@@ -210,6 +215,7 @@ function startClientMode(playerName: string, hostPeerId: string): void {
     },
   });
 
+  client.setStatusCallback((msg) => showLobbyStatus(msg));
   client.connect(hostPeerId).catch((err) => {
     showLobbyStatus(err.message || 'Connection failed. Please try again.');
   });
