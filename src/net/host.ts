@@ -1,6 +1,6 @@
 import Peer, { type DataConnection } from 'peerjs';
-import { TICK_RATE, TICK_DURATION, STATE_BROADCAST_RATE } from '../constants';
-import { createGameState, simulateTick } from '../physics/engine';
+import { TICK_RATE, TICK_DURATION, STATE_BROADCAST_RATE, INPUT_BUFFER_TICKS } from '../constants';
+import { createGameState, simulateTick, removePlayer } from '../physics/engine';
 import { encodeState } from './protocol';
 import { decodeInput } from './protocol';
 import type {
@@ -16,6 +16,7 @@ export interface HostCallbacks {
   onReady: (peerId: string) => void;
   onPlayerJoin: (player: LobbyPlayer) => void;
   onPlayerLeave: (playerId: number) => void;
+  onPlayerDisconnect: (playerName: string) => void;
   onGameStart: (state: GameState) => void;
   onTick: (state: GameState) => void;
 }
@@ -26,6 +27,8 @@ interface ConnectedClient {
   name: string;
   team: Team;
   lastInput: InputFrame;
+  /** Ticks since last input was received. Used for input buffering. */
+  inputAge: number;
 }
 
 export class GameHost {
@@ -94,19 +97,47 @@ export class GameHost {
       });
 
       conn.on('close', () => {
-        const client = this.clients.get(conn.peer);
-        if (client) {
-          this.clients.delete(conn.peer);
-          this.callbacks.onPlayerLeave(client.playerId);
-          this.broadcastPlayerList();
-        }
+        this.handleClientDisconnect(conn.peer);
       });
     });
+  }
+
+  private handleClientDisconnect(peerId: string): void {
+    const client = this.clients.get(peerId);
+    if (!client) return;
+
+    this.clients.delete(peerId);
+
+    if (this.running && this.state) {
+      // Mid-game: remove player from game state, sub reserve if available
+      const name = removePlayer(this.state, client.playerId);
+      // Remove from ID mapping
+      this.playerIdToStateIdx.delete(client.playerId);
+      if (name) {
+        this.callbacks.onPlayerDisconnect(name);
+        // Notify remaining clients about the disconnect
+        const msg: LobbyMessage = { type: 'playerLeft', playerName: name };
+        for (const c of this.clients.values()) {
+          c.conn.send(msg);
+        }
+      }
+    } else {
+      // In lobby: just remove from player list
+      this.callbacks.onPlayerLeave(client.playerId);
+      this.broadcastPlayerList();
+    }
   }
 
   private handleLobbyMessage(conn: DataConnection, msg: LobbyMessage): void {
     switch (msg.type) {
       case 'join': {
+        // Late-join prevention: reject joins after match has started
+        if (this.running) {
+          const reject: LobbyMessage = { type: 'rejected', reason: 'Match already in progress' };
+          conn.send(reject);
+          return;
+        }
+
         const playerId = this.nextPlayerId++;
         const client: ConnectedClient = {
           conn,
@@ -114,6 +145,7 @@ export class GameHost {
           name: msg.name,
           team: 'blue', // Default new players to blue
           lastInput: { dx: 0, dy: 0, kick: false },
+          inputAge: 0,
         };
         this.clients.set(conn.peer, client);
 
@@ -143,6 +175,7 @@ export class GameHost {
     const decoded = decodeInput(data);
     if (decoded) {
       client.lastInput = decoded.input;
+      client.inputAge = 0; // Reset age — we got fresh input
     }
   }
 
@@ -221,11 +254,16 @@ export class GameHost {
       inputs.set(hostIdx, this.hostInput);
     }
 
-    // Client inputs
+    // Client inputs — replay last input for INPUT_BUFFER_TICKS, then zero
     for (const client of this.clients.values()) {
       const idx = this.playerIdToStateIdx.get(client.playerId);
       if (idx !== undefined) {
-        inputs.set(idx, client.lastInput);
+        client.inputAge++;
+        if (client.inputAge <= INPUT_BUFFER_TICKS) {
+          inputs.set(idx, client.lastInput);
+        } else {
+          inputs.set(idx, { dx: 0, dy: 0, kick: false });
+        }
       }
     }
 
@@ -268,6 +306,10 @@ export class GameHost {
   }
 
   stop(): void {
+    // Broadcast final state so clients see the game-over
+    if (this.running) {
+      this.broadcastState();
+    }
     this.running = false;
     if (this.tickInterval) {
       clearInterval(this.tickInterval);

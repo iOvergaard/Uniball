@@ -11,6 +11,8 @@ export interface ClientCallbacks {
   onGameStart: () => void;
   onStateUpdate: (state: GameState) => void;
   onDisconnect: () => void;
+  onPlayerLeft: (playerName: string) => void;
+  onRejected: (reason: string) => void;
 }
 
 export class GameClient {
@@ -93,6 +95,12 @@ export class GameClient {
       case 'start':
         this.playerNames = msg.playerNames;
         this.callbacks.onGameStart();
+        break;
+      case 'playerLeft':
+        this.callbacks.onPlayerLeft(msg.playerName);
+        break;
+      case 'rejected':
+        this.callbacks.onRejected(msg.reason);
         break;
     }
   }

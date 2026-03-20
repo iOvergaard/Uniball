@@ -50,3 +50,20 @@ export function hideOverlay(): void {
     overlay = null;
   }
 }
+
+/** Show a brief notification toast (auto-dismisses after 3 seconds). */
+export function showNotification(message: string): void {
+  const toast = document.createElement('div');
+  toast.style.cssText =
+    'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+    'padding:10px 20px;background:rgba(0,0,0,0.8);color:#fff;border-radius:8px;' +
+    'font-family:sans-serif;font-size:14px;z-index:60;pointer-events:none;' +
+    'transition:opacity 0.5s;opacity:1;';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 500);
+  }, 3000);
+}

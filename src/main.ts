@@ -14,7 +14,7 @@ import {
   hideLobby,
   showLobbyStatus,
 } from './ui/lobby-ui';
-import { showDisconnected, showGameOver } from './ui/screens';
+import { showDisconnected, showGameOver, showNotification } from './ui/screens';
 import type { GameState, InputFrame, LobbyPlayer, Team } from './types';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -111,6 +111,9 @@ function startHostMode(hostName: string): void {
     onPlayerLeave: () => {
       updateLobbyPlayers(host.getLobbyPlayers());
     },
+    onPlayerDisconnect: (playerName: string) => {
+      showNotification(`${playerName} left the game`);
+    },
     onGameStart: () => {
       hideLobby();
       startHostGameLoop(host);
@@ -179,6 +182,12 @@ function startClientMode(playerName: string, hostPeerId: string): void {
     },
     onDisconnect: () => {
       showDisconnected();
+    },
+    onPlayerLeft: (playerName: string) => {
+      showNotification(`${playerName} left the game`);
+    },
+    onRejected: (reason: string) => {
+      showLobbyStatus(`Rejected: ${reason}`);
     },
   });
 

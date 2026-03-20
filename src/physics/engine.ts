@@ -1,4 +1,4 @@
-import { GameState, InputFrame } from '../types';
+import { GameState, InputFrame, PlayerState } from '../types';
 import {
   FIELD_WIDTH,
   FIELD_HEIGHT,
@@ -243,4 +243,35 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
     state.ball.velocity = vec2(0, 0);
     resetPlayersToPositions(state.players, state.halfSwapped);
   }
+}
+
+/**
+ * Remove a player from the game. If the player was on field and the team has
+ * reserves, immediately sub one in. Returns the removed player's name (for notifications).
+ */
+export function removePlayer(state: GameState, playerId: number): string | null {
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx === -1) return null;
+
+  const player = state.players[idx];
+  const name = player.name;
+  const team = player.team;
+  const wasOnField = player.onField;
+
+  // Remove from players array
+  state.players.splice(idx, 1);
+
+  // If the removed player was on field and the team has a reserve, sub one in
+  if (wasOnField) {
+    const reserves = state.players.filter((p) => p.team === team && !p.onField);
+    if (reserves.length > 0) {
+      // Pick longest-waiting reserve
+      reserves.sort((a, b) => a.benchedAtTick - b.benchedAtTick);
+      reserves[0].onField = true;
+    }
+    // Reset positions so players aren't left in weird spots
+    resetPlayersToPositions(state.players, state.halfSwapped);
+  }
+
+  return name;
 }

@@ -45,6 +45,8 @@ export const KICKOFF_COUNTDOWN_TICKS = 180; // 3 seconds
 export const STATE_BROADCAST_RATE = 20; // Hz — host broadcasts state snapshots
 export const STATE_BROADCAST_INTERVAL = 1000 / STATE_BROADCAST_RATE;
 export const INTERPOLATION_BUFFER_MS = 50; // Client render delay for smooth interpolation
+export const INPUT_BUFFER_TICKS = 10; // Replay last input for N ticks on packet loss
+export const DISCONNECT_GRACE_TICKS = 300; // 5 seconds grace period before treating as leave
 
 // === Protocol message types ===
 export const MSG_INPUT = 1;
