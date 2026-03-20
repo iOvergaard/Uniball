@@ -104,18 +104,17 @@ function handleTouchEnd(e: TouchEvent): void {
   }
 }
 
-/** Read current input state from keyboard + touch. */
-export function readInput(): InputFrame {
+/** Read Player 1 input: WASD + Space (+ touch). */
+export function readInputP1(): InputFrame {
   let dx = 0;
   let dy = 0;
 
-  // Keyboard
-  if (keys.has('KeyW') || keys.has('ArrowUp')) dy -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) dy += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
+  if (keys.has('KeyW')) dy -= 1;
+  if (keys.has('KeyS')) dy += 1;
+  if (keys.has('KeyA')) dx -= 1;
+  if (keys.has('KeyD')) dx += 1;
 
-  const keyKick = keys.has('Space') || keys.has('Enter');
+  const keyKick = keys.has('Space');
 
   // Merge touch input (touch overrides if joystick is active)
   if (joystickActive) {
@@ -124,6 +123,32 @@ export function readInput(): InputFrame {
   }
 
   return { dx, dy, kick: keyKick || touchKick };
+}
+
+/** Read Player 2 input: Arrow keys + Enter. */
+export function readInputP2(): InputFrame {
+  let dx = 0;
+  let dy = 0;
+
+  if (keys.has('ArrowUp')) dy -= 1;
+  if (keys.has('ArrowDown')) dy += 1;
+  if (keys.has('ArrowLeft')) dx -= 1;
+  if (keys.has('ArrowRight')) dx += 1;
+
+  const kick = keys.has('Enter');
+
+  return { dx, dy, kick };
+}
+
+/** Read combined input (for single-player / network). */
+export function readInput(): InputFrame {
+  const p1 = readInputP1();
+  const p2 = readInputP2();
+  return {
+    dx: p1.dx || p2.dx,
+    dy: p1.dy || p2.dy,
+    kick: p1.kick || p2.kick,
+  };
 }
 
 /** Whether touch controls are active (for rendering overlay). */
