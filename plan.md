@@ -244,6 +244,11 @@ interface InputFrame {
 
 - `src/physics/engine.test.ts` — 27 unit tests for physics, collisions, scoring, timer, substitutions
 - `src/test/acceptance.test.ts` — 17 acceptance tests: full match simulations with bot players, invariant checks every tick
+- `src/net/protocol.test.ts` — 14 binary protocol round-trip tests
+- `src/net/lobby.test.ts` — 13 lobby flow and multi-player game simulation tests
+- `src/render/renderer.test.ts` — 11 state snapshot and camera fitting tests
+
+**Total: 82 tests**
 
 ### Acceptance Tests
 

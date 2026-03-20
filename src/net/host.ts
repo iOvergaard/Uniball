@@ -154,13 +154,16 @@ export class GameHost {
     }
   }
 
-  startGame(): void {
-    if (this.running) return;
+  startGame(): boolean {
+    if (this.running) return false;
 
     // Count players per team
     const players = this.getLobbyPlayers();
     const redCount = players.filter((p) => p.team === 'red').length;
     const blueCount = players.filter((p) => p.team === 'blue').length;
+
+    // Need at least 1 player on each team
+    if (redCount === 0 || blueCount === 0) return false;
 
     this.state = createGameState(redCount, blueCount);
 
@@ -184,8 +187,14 @@ export class GameHost {
       this.playerIdToStateIdx.set(bluePlayers[i].id, redCount + i);
     }
 
+    // Build name map: game-state player index → name
+    const playerNames: Record<number, string> = {};
+    for (const p of this.state.players) {
+      playerNames[p.id] = p.name;
+    }
+
     // Notify clients
-    const startMsg: LobbyMessage = { type: 'start' };
+    const startMsg: LobbyMessage = { type: 'start', playerNames };
     for (const client of this.clients.values()) {
       client.conn.send(startMsg);
     }
@@ -195,6 +204,7 @@ export class GameHost {
 
     // Start tick loop
     this.tickInterval = setInterval(() => this.tick(), TICK_DURATION);
+    return true;
   }
 
   private playerIdToStateIdx: Map<number, number> = new Map();
