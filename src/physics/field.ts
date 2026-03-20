@@ -1,9 +1,5 @@
 import { Vec2, Team, PlayerState } from '../types';
-import {
-  FIELD_WIDTH, FIELD_HEIGHT,
-  GOAL_Y_MIN, GOAL_Y_MAX,
-  PLAYER_RADIUS,
-} from '../constants';
+import { FIELD_WIDTH, FIELD_HEIGHT, GOAL_Y_MIN, GOAL_Y_MAX, PLAYER_RADIUS } from '../constants';
 import { vec2 } from '../util/math';
 
 /** Check if ball position is inside a goal. Returns scoring team or null. */
@@ -19,11 +15,7 @@ export function checkGoal(ballPos: Vec2): Team | null {
 }
 
 /** Get starting positions for players on a team. Spread evenly on their half. */
-export function getStartingPositions(
-  team: Team,
-  count: number,
-  halfSwapped: boolean,
-): Vec2[] {
+export function getStartingPositions(team: Team, count: number, halfSwapped: boolean): Vec2[] {
   const isLeftSide = (team === 'red') !== halfSwapped;
   const baseX = isLeftSide ? FIELD_WIDTH * 0.25 : FIELD_WIDTH * 0.75;
   const positions: Vec2[] = [];
@@ -42,8 +34,8 @@ export function getStartingPositions(
 
 /** Reset all players to starting positions and zero velocity. */
 export function resetPlayersToPositions(players: PlayerState[], halfSwapped: boolean): void {
-  const redPlayers = players.filter(p => p.team === 'red');
-  const bluePlayers = players.filter(p => p.team === 'blue');
+  const redPlayers = players.filter((p) => p.team === 'red');
+  const bluePlayers = players.filter((p) => p.team === 'blue');
 
   const redPositions = getStartingPositions('red', redPlayers.length, halfSwapped);
   const bluePositions = getStartingPositions('blue', bluePlayers.length, halfSwapped);

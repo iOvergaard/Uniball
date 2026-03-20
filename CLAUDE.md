@@ -9,7 +9,7 @@ See [plan.md](./plan.md) for the full implementation plan, architecture decision
 ## Tech Stack
 
 - **Language**: TypeScript (strict mode)
-- **Build**: Vite
+- **Toolchain**: Vite+ (Vite 8, Vitest, Oxlint, Oxfmt)
 - **Networking**: PeerJS (WebRTC DataChannels, P2P)
 - **Rendering**: HTML Canvas 2D
 - **Physics**: Custom circle-based collision
@@ -22,7 +22,10 @@ npm install          # Install dependencies
 npm run dev          # Start dev server (Vite)
 npm run build        # Production build
 npm run preview      # Preview production build
-npx tsc --noEmit     # Type-check without emitting
+npm run test         # Run tests (Vitest)
+npm run lint         # Lint (Oxlint)
+npm run fmt          # Format (Oxfmt)
+npm run check        # All checks: fmt + lint + types
 ```
 
 ## Project Structure
@@ -48,3 +51,4 @@ src/
 - Binary protocol definitions in `src/net/protocol.ts`
 - Host is authoritative — clients never mutate game state directly
 - Player avatars are unicorns with team-colored circles
+- Run `npm run check` before committing to ensure formatting, lint, and types pass

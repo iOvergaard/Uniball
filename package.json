@@ -4,15 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.0",
-    "vite": "^5.4.0"
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vite test",
+    "lint": "vite lint",
+    "fmt": "vite fmt",
+    "check": "vp check"
   },
   "dependencies": {
     "peerjs": "^1.5.4"
+  },
+  "devDependencies": {
+    "vite-plus": "^0.1.12"
   }
 }
