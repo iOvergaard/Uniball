@@ -16,6 +16,7 @@
     "peerjs": "^1.5.4"
   },
   "devDependencies": {
+    "peer": "^1.0.2",
     "vite-plus": "^0.1.12"
   }
 }
