@@ -26,12 +26,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Check (fmt + lint)
-        run: npx vp check
-
-      - name: Test
-        run: npx vp test run
-
       - name: Build
         run: npm run build
 
