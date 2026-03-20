@@ -317,3 +317,76 @@ describe('Reserve Players and Substitutions', () => {
     expect(state.players).toHaveLength(totalBefore);
   });
 });
+
+describe('Two-Player Local Input', () => {
+  it('both players move independently with separate inputs', () => {
+    const state = createGameState(1, 1);
+    skipKickoff(state);
+
+    const p0Start = { ...state.players[0].position };
+    const p1Start = { ...state.players[1].position };
+
+    // Player 0 moves right, Player 1 moves left
+    const inputs = new Map<number, InputFrame>();
+    inputs.set(0, { dx: 1, dy: 0, kick: false });
+    inputs.set(1, { dx: -1, dy: 0, kick: false });
+
+    for (let i = 0; i < 30; i++) {
+      simulateTick(state, inputs);
+    }
+
+    expect(state.players[0].position.x).toBeGreaterThan(p0Start.x);
+    expect(state.players[1].position.x).toBeLessThan(p1Start.x);
+  });
+
+  it('only the player with input moves', () => {
+    const state = createGameState(1, 1);
+    skipKickoff(state);
+
+    const p1Start = { ...state.players[1].position };
+
+    // Only Player 0 has input
+    for (let i = 0; i < 30; i++) {
+      simulateTick(state, makeInput(0, 0, 1, false));
+    }
+
+    // Player 1 should stay roughly in place (only damping, no acceleration)
+    expect(Math.abs(state.players[1].position.x - p1Start.x)).toBeLessThan(1);
+    expect(Math.abs(state.players[1].position.y - p1Start.y)).toBeLessThan(1);
+  });
+
+  it('both players can kick the ball', () => {
+    const state = createGameState(1, 1);
+    skipKickoff(state);
+
+    // Move player 0 close to ball and kick
+    state.players[0].position = {
+      x: state.ball.position.x - PLAYER_RADIUS - 5,
+      y: state.ball.position.y,
+    };
+    simulateTick(state, makeInput(0, 1, 0, true));
+    const ballSpeedAfterP0Kick = Math.hypot(state.ball.velocity.x, state.ball.velocity.y);
+    expect(ballSpeedAfterP0Kick).toBeGreaterThan(0);
+
+    // Reset ball
+    state.ball.velocity = { x: 0, y: 0 };
+    state.ball.position = { x: FIELD_WIDTH / 2, y: FIELD_HEIGHT / 2 };
+
+    // Move player 1 close to ball and kick
+    state.players[1].position = {
+      x: state.ball.position.x + PLAYER_RADIUS + 5,
+      y: state.ball.position.y,
+    };
+    state.players[1].kickCooldown = 0;
+    simulateTick(state, makeInput(1, -1, 0, true));
+    const ballSpeedAfterP1Kick = Math.hypot(state.ball.velocity.x, state.ball.velocity.y);
+    expect(ballSpeedAfterP1Kick).toBeGreaterThan(0);
+  });
+
+  it('two-player game has one red and one blue player', () => {
+    const state = createGameState(1, 1);
+    expect(state.players[0].team).toBe('red');
+    expect(state.players[1].team).toBe('blue');
+    expect(state.players).toHaveLength(2);
+  });
+});
