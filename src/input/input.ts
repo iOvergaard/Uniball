@@ -3,13 +3,31 @@ import { InputFrame } from '../types';
 // --- Keyboard state ---
 const keys = new Set<string>();
 
-// --- Touch state ---
-let touchDx = 0;
-let touchDy = 0;
-let touchKick = false;
-let joystickActive = false;
-let joystickId: number | null = null;
-let joystickOrigin = { x: 0, y: 0 };
+// --- Touch state (per-player) ---
+interface TouchPlayer {
+  dx: number;
+  dy: number;
+  kick: boolean;
+  joystickActive: boolean;
+  joystickId: number | null;
+  joystickOrigin: { x: number; y: number };
+  kickTouchId: number | null;
+}
+
+function createTouchPlayer(): TouchPlayer {
+  return {
+    dx: 0,
+    dy: 0,
+    kick: false,
+    joystickActive: false,
+    joystickId: null,
+    joystickOrigin: { x: 0, y: 0 },
+    kickTouchId: null,
+  };
+}
+
+const touchP1 = createTouchPlayer();
+const touchP2 = createTouchPlayer();
 
 const JOYSTICK_RADIUS = 50;
 const JOYSTICK_DEAD_ZONE = 8;
@@ -43,23 +61,49 @@ function initTouchControls(): void {
   window.addEventListener('touchcancel', handleTouchEnd);
 }
 
-function handleTouchStart(e: TouchEvent): void {
-  const w = window.innerWidth;
+/**
+ * Screen is split into 4 zones:
+ *   [P1 joystick] [P1 kick] [P2 joystick] [P2 kick]
+ *     0 - 25%      25 - 50%   50 - 75%     75 - 100%
+ */
+function getTouchZone(clientX: number): { player: TouchPlayer; action: 'joystick' | 'kick' } {
+  const quarter = clientX / window.innerWidth;
+  if (quarter < 0.25) return { player: touchP1, action: 'joystick' };
+  if (quarter < 0.5) return { player: touchP1, action: 'kick' };
+  if (quarter < 0.75) return { player: touchP2, action: 'joystick' };
+  return { player: touchP2, action: 'kick' };
+}
 
+function handleTouchStart(e: TouchEvent): void {
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
+    const zone = getTouchZone(t.clientX);
 
-    if (t.clientX < w / 2) {
-      // Left half → joystick
-      joystickId = t.identifier;
-      joystickOrigin = { x: t.clientX, y: t.clientY };
-      joystickActive = true;
-      touchDx = 0;
-      touchDy = 0;
+    if (zone.action === 'joystick') {
+      zone.player.joystickId = t.identifier;
+      zone.player.joystickOrigin = { x: t.clientX, y: t.clientY };
+      zone.player.joystickActive = true;
+      zone.player.dx = 0;
+      zone.player.dy = 0;
     } else {
-      // Right half → kick
-      touchKick = true;
+      zone.player.kick = true;
+      zone.player.kickTouchId = t.identifier;
     }
+  }
+}
+
+function updateJoystick(player: TouchPlayer, clientX: number, clientY: number): void {
+  const dx = clientX - player.joystickOrigin.x;
+  const dy = clientY - player.joystickOrigin.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < JOYSTICK_DEAD_ZONE) {
+    player.dx = 0;
+    player.dy = 0;
+  } else {
+    const clamped = Math.min(dist, JOYSTICK_RADIUS);
+    player.dx = (dx / dist) * (clamped / JOYSTICK_RADIUS);
+    player.dy = (dy / dist) * (clamped / JOYSTICK_RADIUS);
   }
 }
 
@@ -67,44 +111,35 @@ function handleTouchMove(e: TouchEvent): void {
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
 
-    if (t.identifier === joystickId && joystickActive) {
-      const dx = t.clientX - joystickOrigin.x;
-      const dy = t.clientY - joystickOrigin.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < JOYSTICK_DEAD_ZONE) {
-        touchDx = 0;
-        touchDy = 0;
-      } else {
-        // Normalize to -1..1 range, clamped by joystick radius
-        const clamped = Math.min(dist, JOYSTICK_RADIUS);
-        touchDx = (dx / dist) * (clamped / JOYSTICK_RADIUS);
-        touchDy = (dy / dist) * (clamped / JOYSTICK_RADIUS);
-      }
+    if (t.identifier === touchP1.joystickId && touchP1.joystickActive) {
+      updateJoystick(touchP1, t.clientX, t.clientY);
+    }
+    if (t.identifier === touchP2.joystickId && touchP2.joystickActive) {
+      updateJoystick(touchP2, t.clientX, t.clientY);
     }
   }
 }
 
 function handleTouchEnd(e: TouchEvent): void {
-  const w = window.innerWidth;
-
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
 
-    if (t.identifier === joystickId) {
-      joystickActive = false;
-      joystickId = null;
-      touchDx = 0;
-      touchDy = 0;
-    }
-
-    if (t.clientX >= w / 2) {
-      touchKick = false;
+    for (const player of [touchP1, touchP2]) {
+      if (t.identifier === player.joystickId) {
+        player.joystickActive = false;
+        player.joystickId = null;
+        player.dx = 0;
+        player.dy = 0;
+      }
+      if (t.identifier === player.kickTouchId) {
+        player.kick = false;
+        player.kickTouchId = null;
+      }
     }
   }
 }
 
-/** Read Player 1 input: WASD + Space (+ touch). */
+/** Read Player 1 input: WASD + Space (+ left-side touch). */
 export function readInputP1(): InputFrame {
   let dx = 0;
   let dy = 0;
@@ -117,15 +152,15 @@ export function readInputP1(): InputFrame {
   const keyKick = keys.has('Space');
 
   // Merge touch input (touch overrides if joystick is active)
-  if (joystickActive) {
-    dx = touchDx;
-    dy = touchDy;
+  if (touchP1.joystickActive) {
+    dx = touchP1.dx;
+    dy = touchP1.dy;
   }
 
-  return { dx, dy, kick: keyKick || touchKick };
+  return { dx, dy, kick: keyKick || touchP1.kick };
 }
 
-/** Read Player 2 input: Arrow keys + Enter. */
+/** Read Player 2 input: Arrow keys + Enter (+ right-side touch). */
 export function readInputP2(): InputFrame {
   let dx = 0;
   let dy = 0;
@@ -135,9 +170,15 @@ export function readInputP2(): InputFrame {
   if (keys.has('ArrowLeft')) dx -= 1;
   if (keys.has('ArrowRight')) dx += 1;
 
-  const kick = keys.has('Enter');
+  const keyKick = keys.has('Enter');
 
-  return { dx, dy, kick };
+  // Merge touch input
+  if (touchP2.joystickActive) {
+    dx = touchP2.dx;
+    dy = touchP2.dy;
+  }
+
+  return { dx, dy, kick: keyKick || touchP2.kick };
 }
 
 /** Read combined input (for single-player / network). */
@@ -156,21 +197,35 @@ export function isTouchDevice(): boolean {
   return 'ontouchstart' in window;
 }
 
-/** Get joystick state for rendering the overlay. */
-export function getJoystickState(): {
+export interface JoystickState {
   active: boolean;
   originX: number;
   originY: number;
   dx: number;
   dy: number;
   kick: boolean;
-} {
+}
+
+/** Get joystick state for P1 overlay. */
+export function getJoystickStateP1(): JoystickState {
   return {
-    active: joystickActive,
-    originX: joystickOrigin.x,
-    originY: joystickOrigin.y,
-    dx: touchDx,
-    dy: touchDy,
-    kick: touchKick,
+    active: touchP1.joystickActive,
+    originX: touchP1.joystickOrigin.x,
+    originY: touchP1.joystickOrigin.y,
+    dx: touchP1.dx,
+    dy: touchP1.dy,
+    kick: touchP1.kick,
+  };
+}
+
+/** Get joystick state for P2 overlay. */
+export function getJoystickStateP2(): JoystickState {
+  return {
+    active: touchP2.joystickActive,
+    originX: touchP2.joystickOrigin.x,
+    originY: touchP2.joystickOrigin.y,
+    dx: touchP2.dx,
+    dy: touchP2.dy,
+    kick: touchP2.kick,
   };
 }

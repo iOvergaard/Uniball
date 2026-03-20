@@ -23,9 +23,43 @@
         background: #2d6a4f;
         border-radius: 4px;
       }
+      #rotate-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #1a1a2e;
+        color: #fff;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        font-family: sans-serif;
+        text-align: center;
+        padding: 2rem;
+      }
+      #rotate-overlay .icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+      }
+      #rotate-overlay .msg {
+        font-size: 1.2rem;
+        opacity: 0.8;
+      }
+      @media (pointer: coarse) and (orientation: portrait) {
+        #rotate-overlay {
+          display: flex;
+        }
+        canvas {
+          display: none;
+        }
+      }
     </style>
   </head>
   <body>
+    <div id="rotate-overlay">
+      <div class="icon">📱↔️</div>
+      <div class="msg">Rotate your device to landscape mode to play</div>
+    </div>
     <canvas id="game"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
