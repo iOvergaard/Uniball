@@ -173,11 +173,18 @@ Unicorn avatar upgrades (custom SVG sprites with team colors, rotation to face m
 
 **Test**: Game looks polished and feels fun in a group.
 
-### Phase 6: Robustness
+### Phase 6: Robustness & Graceful Degradation
 
-Disconnect handling, late join prevention, input buffering on host (replay last input if packet lost), host disconnect → "Host left" screen.
+Handle all unintended/disruptive scenarios so the game continues smoothly:
 
-**Test**: Disconnect a player mid-game — game continues. Kill host — clients see error screen.
+- **Player leaves mid-game**: Remove player from field. If the team has reserves, immediately sub one in. If not, the team plays short-handed. Other players see a brief "[Player] left" notification.
+- **Host disconnects**: All clients see a "Host left — game over" screen. No recovery (host is authoritative).
+- **Client connection drops temporarily**: Host replays the client's last known input for up to N ticks (input buffering). If the client reconnects within a grace period, they resume seamlessly. If not, treated as a leave.
+- **Late join prevention**: Once the match starts, no new players can join mid-game.
+- **Tab/browser crash**: Same as disconnect — detected via WebRTC connection close event.
+- **Unequal teams after leave**: Game continues even if one team has more players. No forced forfeits.
+
+**Test**: Disconnect a player mid-game — reserve subs in or team plays short. Kill host — clients see error screen. Briefly kill network — player reconnects and resumes.
 
 ## Key Types (`src/types.ts`)
 
