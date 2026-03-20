@@ -316,6 +316,29 @@ describe('Reserve Players and Substitutions', () => {
 
     expect(state.players).toHaveLength(totalBefore);
   });
+
+  it('fair rotation: all reserves get field time after enough substitutions', () => {
+    // 6 per team: IDs 0-3 on field, 4-5 reserves for red
+    const state = createGameState(6, 6);
+    skipKickoff(state);
+
+    // Fast-forward through 3 substitution intervals
+    const ticksFor3Subs = Math.ceil(SUBSTITUTION_INTERVAL_SECONDS * 3 * TICK_RATE) + 30;
+    for (let i = 0; i < ticksFor3Subs; i++) {
+      simulateTick(state, noInput());
+      if (state.phase === 'kickoff') skipKickoff(state);
+      if (state.phase === 'ended') break;
+    }
+
+    // Both reserves (player 4 and 5) should have been on field at some point
+    // After 3 subs: sub1 benches 0 brings 4, sub2 benches 1 brings 5, sub3 benches 2 brings 0
+    // So player 4 and 5 should currently be on field or have been on field
+    // Check: player 4 should be on field (subbed in at interval 1)
+    // Player 5 should be on field (subbed in at interval 2)
+    const redOnField = state.players.filter((p) => p.team === 'red' && p.onField).map((p) => p.id);
+    expect(redOnField).toContain(4);
+    expect(redOnField).toContain(5);
+  });
 });
 
 describe('Two-Player Local Input', () => {

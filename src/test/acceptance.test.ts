@@ -255,6 +255,34 @@ describe('Acceptance: Substitutions', () => {
 
     expect(state.players[4].onField).toBe(true);
   });
+
+  it('all reserves get fair rotation (6 per team)', () => {
+    // 6 per team: 4 on field + 2 reserves. After enough subs, all 6 should play.
+    const duration = SUBSTITUTION_INTERVAL_SECONDS * 5;
+    const state = createShortGame(6, 6, duration);
+    state.halfSwapped = true;
+    const maxTicks = Math.ceil(duration * TICK_RATE) + KICKOFF_COUNTDOWN_TICKS * 100;
+
+    const fieldTimeTicks = new Map<number, number>();
+    for (const p of state.players) {
+      fieldTimeTicks.set(p.id, 0);
+    }
+
+    for (let i = 0; i < maxTicks; i++) {
+      simulateTick(state, allPlayersInput(state, chaseBallInput));
+      for (const p of state.players) {
+        if (p.onField) {
+          fieldTimeTicks.set(p.id, (fieldTimeTicks.get(p.id) ?? 0) + 1);
+        }
+      }
+      if (state.phase === 'ended') break;
+    }
+
+    // Every player should have had field time
+    for (const [id, ticks] of fieldTimeTicks) {
+      expect(ticks, `player ${id} never got field time`).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('Acceptance: Ball Physics Integrity', () => {
