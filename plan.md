@@ -45,7 +45,7 @@ src/
     client.ts              — Client: send inputs, receive state, interpolate
     protocol.ts            — Binary message encoding/decoding (input: 12B, state: ~230B)
     protocol.test.ts       — 14 tests for binary round-trip encoding
-    lobby.ts               — (Phase 4) Room creation, join flow, team selection
+    lobby.test.ts          — 13 tests for lobby flow and multi-player simulation
   input/
     input.ts               — Keyboard capture → InputFrame
   game/                    — (Phase 4) Separate game loops
@@ -53,10 +53,9 @@ src/
     game-client.ts         — Client game loop: send inputs + interpolate + render
     rules.ts               — Kickoff, halftime, goals, game-over logic
     state.ts               — GameState factory functions
-  ui/                      — (Phase 4) DOM-based UI
-    lobby-ui.ts            — Lobby screen (create/join, team pick, player list)
-    hud-ui.ts              — In-game HUD
-    screens.ts             — Game-over, halftime overlays
+  ui/                      — DOM-based UI
+    lobby-ui.ts            — Lobby screens (landing, host lobby, client lobby, player list)
+    screens.ts             — Disconnect overlay
   util/
     math.ts                — Vec2 helpers (add, sub, scale, length, normalize, dot, dist)
 ```
@@ -160,9 +159,9 @@ PeerJS integration. Host runs physics at 60 Hz, broadcasts state snapshots at 20
 
 **Test**: Two browser tabs connected. Both players move, kick ball. Physics authoritative on host tab.
 
-### Phase 4: Lobby + Multi-Player
+### Phase 4: Lobby + Multi-Player — DONE
 
-Full lobby UI with shareable link, team selection, player names, ready-up. Support up to 14 players (4 on field per team + reserves).
+Full lobby UI: landing screen (create/join/local), host lobby with shareable link, team picker, player list with team columns. Client lobby with team switching. Disconnect screen. Refactored main.ts to route through lobby UI before game start. 13 new lobby tests covering player management, team assignment, 4-8 player game simulations with invariants, state broadcast round-trips, and substitution with network players.
 
 **Test**: Multiple tabs join room, pick teams, host starts game, everyone plays together. Substitutions rotate reserves in.
 
