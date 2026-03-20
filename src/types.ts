@@ -12,6 +12,7 @@ export interface PlayerState {
   team: Team;
   kickCooldown: number;
   name: string;
+  onField: boolean;
 }
 
 export interface BallState {
@@ -31,6 +32,7 @@ export interface GameState {
   players: PlayerState[];
   ball: BallState;
   halfSwapped: boolean;
+  lastSubstitutionTime: number;
 }
 
 export interface InputFrame {

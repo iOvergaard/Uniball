@@ -21,6 +21,8 @@ import {
   HALFTIME_SECONDS,
   KICKOFF_COUNTDOWN_TICKS,
   TICK_RATE,
+  MAX_ON_FIELD_PER_TEAM,
+  SUBSTITUTION_INTERVAL_SECONDS,
 } from '../constants';
 import { vec2, vec2Add, vec2Scale, vec2Normalize, vec2Sub, vec2Length } from '../util/math';
 import { resolveCircleCircle, resolveCircleWall } from './collision';
@@ -38,6 +40,7 @@ export function createGameState(redCount: number, blueCount: number): GameState 
       team: 'red' as const,
       kickCooldown: 0,
       name: `Red ${i + 1}`,
+      onField: i < MAX_ON_FIELD_PER_TEAM,
     });
   }
   for (let i = 0; i < blueCount; i++) {
@@ -48,6 +51,7 @@ export function createGameState(redCount: number, blueCount: number): GameState 
       team: 'blue' as const,
       kickCooldown: 0,
       name: `Blue ${i + 1}`,
+      onField: i < MAX_ON_FIELD_PER_TEAM,
     });
   }
 
@@ -61,10 +65,22 @@ export function createGameState(redCount: number, blueCount: number): GameState 
     players,
     ball: { position: vec2(FIELD_WIDTH / 2, FIELD_HEIGHT / 2), velocity: vec2(0, 0) },
     halfSwapped: false,
+    lastSubstitutionTime: MATCH_DURATION_SECONDS,
   };
 
   resetPlayersToPositions(state.players, state.halfSwapped);
   return state;
+}
+
+/** Perform forced substitution for a team: rotate oldest on-field player to bench, bring in next reserve. */
+function substituteTeam(players: PlayerState[], team: 'red' | 'blue'): void {
+  const onField = players.filter((p) => p.team === team && p.onField);
+  const reserves = players.filter((p) => p.team === team && !p.onField);
+  if (reserves.length === 0) return;
+
+  // Rotate: first on-field player goes to bench, first reserve comes on
+  onField[0].onField = false;
+  reserves[0].onField = true;
 }
 
 /** Advance simulation by one tick. inputs is a Map from player id → InputFrame. */
@@ -103,8 +119,18 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
     return;
   }
 
-  // --- Apply player inputs ---
-  for (const player of state.players) {
+  // --- Forced substitutions every SUBSTITUTION_INTERVAL_SECONDS ---
+  const elapsed = state.lastSubstitutionTime - state.matchTime;
+  if (elapsed >= SUBSTITUTION_INTERVAL_SECONDS) {
+    substituteTeam(state.players, 'red');
+    substituteTeam(state.players, 'blue');
+    state.lastSubstitutionTime = state.matchTime;
+    resetPlayersToPositions(state.players, state.halfSwapped);
+  }
+
+  // --- Apply player inputs (on-field only) ---
+  const activePlayers = state.players.filter((p) => p.onField);
+  for (const player of activePlayers) {
     const input = inputs.get(player.id);
     if (input) {
       const dir = vec2Normalize(vec2(input.dx, input.dy));
@@ -143,7 +169,7 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   state.ball.position = vec2Add(state.ball.position, state.ball.velocity);
 
   // --- Player-ball collision ---
-  for (const player of state.players) {
+  for (const player of activePlayers) {
     resolveCircleCircle(
       {
         position: player.position,
@@ -161,10 +187,10 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   }
 
   // --- Player-player collision ---
-  for (let i = 0; i < state.players.length; i++) {
-    for (let j = i + 1; j < state.players.length; j++) {
-      const a = state.players[i];
-      const b = state.players[j];
+  for (let i = 0; i < activePlayers.length; i++) {
+    for (let j = i + 1; j < activePlayers.length; j++) {
+      const a = activePlayers[i];
+      const b = activePlayers[j];
       resolveCircleCircle(
         { position: a.position, velocity: a.velocity, radius: PLAYER_RADIUS, mass: PLAYER_MASS },
         { position: b.position, velocity: b.velocity, radius: PLAYER_RADIUS, mass: PLAYER_MASS },
@@ -173,7 +199,7 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   }
 
   // --- Wall collisions ---
-  for (const player of state.players) {
+  for (const player of activePlayers) {
     resolveCircleWall(
       player.position,
       player.velocity,

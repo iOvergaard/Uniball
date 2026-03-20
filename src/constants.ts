@@ -30,6 +30,10 @@ export const KICK_COOLDOWN_TICKS = 15;
 export const WALL_RESTITUTION_PLAYER = 0.5;
 export const WALL_RESTITUTION_BALL = 0.8;
 
+// === Substitution ===
+export const MAX_ON_FIELD_PER_TEAM = 4;
+export const SUBSTITUTION_INTERVAL_SECONDS = 60;
+
 // === Timing ===
 export const TICK_RATE = 60;
 export const TICK_DURATION = 1000 / TICK_RATE;
