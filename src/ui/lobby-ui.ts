@@ -18,7 +18,7 @@ function getRoot(): HTMLDivElement {
     root = document.createElement('div');
     root.id = 'lobby-root';
     root.style.cssText =
-      'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1a1a2e;z-index:100;font-family:sans-serif;color:#fff;';
+      'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1a1a2e;z-index:2000;font-family:sans-serif;color:#fff;';
     document.body.appendChild(root);
   }
   return root;
