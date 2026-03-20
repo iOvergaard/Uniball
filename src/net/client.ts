@@ -13,6 +13,7 @@ export interface ClientCallbacks {
   onDisconnect: () => void;
   onPlayerLeft: (playerName: string) => void;
   onRejected: (reason: string) => void;
+  onChat?: (name: string, text: string) => void;
 }
 
 export class GameClient {
@@ -69,6 +70,11 @@ export class GameClient {
     this.conn?.send(msg);
   }
 
+  sendChat(text: string): void {
+    const msg: LobbyMessage = { type: 'chat', name: '', text };
+    this.conn?.send(msg);
+  }
+
   sendInput(input: InputFrame): void {
     if (!this.conn) return;
     const buf = encodeInput(this.inputSeq++, input);
@@ -101,6 +107,9 @@ export class GameClient {
         break;
       case 'rejected':
         this.callbacks.onRejected(msg.reason);
+        break;
+      case 'chat':
+        this.callbacks.onChat?.(msg.name, msg.text);
         break;
     }
   }
@@ -184,6 +193,7 @@ export class GameClient {
       ball: snap.ball,
       halfSwapped: snap.halfSwapped,
       lastSubstitutionTime: snap.lastSubstitutionTime,
+      inOvertime: snap.inOvertime,
     };
   }
 
@@ -216,6 +226,7 @@ export class GameClient {
       ball,
       halfSwapped: to.halfSwapped,
       lastSubstitutionTime: to.lastSubstitutionTime,
+      inOvertime: to.inOvertime,
     };
   }
 

@@ -23,8 +23,17 @@ import {
   TICK_RATE,
   MAX_ON_FIELD_PER_TEAM,
   SUBSTITUTION_INTERVAL_SECONDS,
+  OVERTIME_DURATION_SECONDS,
 } from '../constants';
-import { vec2, vec2Add, vec2Scale, vec2Normalize, vec2Sub, vec2Length } from '../util/math';
+import {
+  vec2,
+  vec2Normalize,
+  vec2Sub,
+  vec2Length,
+  vec2AddMut,
+  vec2ScaleMut,
+  vec2ClampMut,
+} from '../util/math';
 import { resolveCircleCircle, resolveCircleWall } from './collision';
 import { checkGoal, resetPlayersToPositions } from './field';
 
@@ -68,6 +77,7 @@ export function createGameState(redCount: number, blueCount: number): GameState 
     ball: { position: vec2(FIELD_WIDTH / 2, FIELD_HEIGHT / 2), velocity: vec2(0, 0) },
     halfSwapped: false,
     lastSubstitutionTime: MATCH_DURATION_SECONDS,
+    inOvertime: false,
   };
 
   resetPlayersToPositions(state.players, state.halfSwapped);
@@ -118,9 +128,25 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
     return;
   }
 
-  // Check game over
+  // Check game over / overtime
   if (state.matchTime <= 0) {
     state.matchTime = 0;
+    if (state.inOvertime) {
+      // Overtime expired with no golden goal — ends as draw
+      state.phase = 'ended';
+      return;
+    }
+    // Regulation ended — tie goes to sudden death overtime
+    if (state.scoreRed === state.scoreBlue) {
+      state.inOvertime = true;
+      state.phase = 'kickoff';
+      state.kickoffCountdown = KICKOFF_COUNTDOWN_TICKS;
+      state.matchTime = OVERTIME_DURATION_SECONDS;
+      state.ball.position = vec2(FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+      state.ball.velocity = vec2(0, 0);
+      resetPlayersToPositions(state.players, state.halfSwapped);
+      return;
+    }
     state.phase = 'ended';
     return;
   }
@@ -135,18 +161,19 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   }
 
   // --- Apply player inputs (on-field only) ---
-  const activePlayers = state.players.filter((p) => p.onField);
-  for (const player of activePlayers) {
+  // Build active list without allocation via filter
+  const players = state.players;
+  const activeCount = players.length;
+  for (let pi = 0; pi < activeCount; pi++) {
+    const player = players[pi];
+    if (!player.onField) continue;
+
     const input = inputs.get(player.id);
     if (input) {
       const dir = vec2Normalize(vec2(input.dx, input.dy));
-      player.velocity = vec2Add(player.velocity, vec2Scale(dir, PLAYER_ACCEL));
-
-      // Clamp speed
-      const speed = vec2Length(player.velocity);
-      if (speed > MAX_PLAYER_SPEED) {
-        player.velocity = vec2Scale(vec2Normalize(player.velocity), MAX_PLAYER_SPEED);
-      }
+      vec2ScaleMut(dir, PLAYER_ACCEL);
+      vec2AddMut(player.velocity, dir);
+      vec2ClampMut(player.velocity, MAX_PLAYER_SPEED);
 
       // Kick
       if (input.kick && player.kickCooldown <= 0) {
@@ -154,7 +181,8 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
         const dist = vec2Length(toBall);
         if (dist < KICK_RANGE && dist > 0) {
           const kickDir = vec2Normalize(toBall);
-          state.ball.velocity = vec2Add(state.ball.velocity, vec2Scale(kickDir, KICK_FORCE));
+          vec2ScaleMut(kickDir, KICK_FORCE);
+          vec2AddMut(state.ball.velocity, kickDir);
           player.kickCooldown = KICK_COOLDOWN_TICKS;
         }
       }
@@ -163,19 +191,32 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
     // Tick cooldown
     if (player.kickCooldown > 0) player.kickCooldown--;
 
-    // Apply damping
-    player.velocity = vec2Scale(player.velocity, PLAYER_DAMPING);
+    // Apply damping (in-place)
+    vec2ScaleMut(player.velocity, PLAYER_DAMPING);
 
-    // Integrate position
-    player.position = vec2Add(player.position, player.velocity);
+    // Integrate position (in-place)
+    vec2AddMut(player.position, player.velocity);
   }
 
   // --- Ball physics ---
-  state.ball.velocity = vec2Scale(state.ball.velocity, BALL_DAMPING);
-  state.ball.position = vec2Add(state.ball.position, state.ball.velocity);
+  vec2ScaleMut(state.ball.velocity, BALL_DAMPING);
+  vec2AddMut(state.ball.position, state.ball.velocity);
+
+  // --- Build active player list for collision ---
+  const activePlayers: PlayerState[] = [];
+  for (let pi = 0; pi < activeCount; pi++) {
+    if (players[pi].onField) activePlayers.push(players[pi]);
+  }
 
   // --- Player-ball collision ---
-  for (const player of activePlayers) {
+  const ballCircle = {
+    position: state.ball.position,
+    velocity: state.ball.velocity,
+    radius: BALL_RADIUS,
+    mass: BALL_MASS,
+  };
+  for (let i = 0; i < activePlayers.length; i++) {
+    const player = activePlayers[i];
     resolveCircleCircle(
       {
         position: player.position,
@@ -183,12 +224,7 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
         radius: PLAYER_RADIUS,
         mass: PLAYER_MASS,
       },
-      {
-        position: state.ball.position,
-        velocity: state.ball.velocity,
-        radius: BALL_RADIUS,
-        mass: BALL_MASS,
-      },
+      ballCircle,
     );
   }
 
@@ -235,6 +271,13 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   if (scoringTeam) {
     if (scoringTeam === 'red') state.scoreRed++;
     else state.scoreBlue++;
+
+    // Golden goal in overtime — match ends immediately
+    if (state.inOvertime) {
+      state.phase = 'ended';
+      state.matchTime = 0;
+      return;
+    }
 
     // Reset for kickoff
     state.phase = 'kickoff';

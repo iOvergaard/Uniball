@@ -37,7 +37,7 @@ src/
   types.ts           — Shared type definitions (game state, networking, lobby)
   physics/           — Game simulation (engine, collision, field)
     engine.ts        — Fixed-timestep physics, substitution, scoring
-    engine.test.ts   — 27 unit tests
+    engine.test.ts   — 30 unit tests (incl. overtime)
     collision.ts     — Circle-circle and circle-wall resolution
     field.ts         — Field geometry, goal detection, positioning
   render/            — Canvas 2D drawing
@@ -45,20 +45,23 @@ src/
     renderer.test.ts — 11 snapshot + camera tests
     camera.ts        — Viewport scaling, DPR, HUD-aware resize
     touch-overlay.ts — Touch joystick controls
+    unicorn-sprite.ts — Pre-rendered unicorn sprites (offscreen canvas cache)
+  audio/             — Sound effects
+    sfx.ts           — Procedural Web Audio API sounds (kick, goal, whistle, etc.)
   net/               — PeerJS networking
-    host.ts          — Host: connections, physics loop, state broadcast, disconnect handling
-    client.ts        — Client: input send, state receive, interpolation
+    host.ts          — Host: connections, physics loop, state broadcast, disconnect handling, chat relay
+    client.ts        — Client: input send, state receive, interpolation, chat
     protocol.ts      — Binary encoding/decoding (input 12B, state ~230B)
     protocol.test.ts — 14 round-trip tests
     lobby.test.ts    — 13 lobby + multiplayer simulation tests
     robustness.test.ts — 10 disconnect/buffering/late-join tests
   input/             — Keyboard/touch input capture
   ui/                — DOM-based UI
-    lobby-ui.ts      — Landing, host lobby, client lobby screens
+    lobby-ui.ts      — Landing, host lobby, client lobby screens, chat box
     screens.ts       — Disconnect + game-over overlays + notification toasts
   test/              — Acceptance tests
-    acceptance.test.ts — 17 bot-driven full match simulations
-  util/              — Vec2 math helpers
+    acceptance.test.ts — 18 bot-driven full match simulations (incl. overtime)
+  util/              — Vec2 math helpers (incl. mutable variants)
 ```
 
 ## Conventions
@@ -74,4 +77,8 @@ src/
 - Host input buffering: replays last input for `INPUT_BUFFER_TICKS` on packet loss
 - Late-join prevention: host rejects join requests after match starts
 - Input listeners are cleaned up via `destroyInput()` — no leaked listeners
+- Sudden death overtime triggers on tied regulation score (60s, golden goal)
+- Sound effects are procedural (Web Audio API) — M key toggles mute
+- Lobby chat relayed through host to all clients
+- Unicorn sprites are pre-rendered to offscreen canvases for performance
 - Run `npm run check` before committing to ensure formatting, lint, and types pass

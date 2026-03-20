@@ -7,6 +7,7 @@ export interface LobbyUICallbacks {
   onLocalPlay: () => void;
   onTeamChange: (team: Team) => void;
   onStartGame: () => void;
+  onChat?: (text: string) => void;
 }
 
 /** Root container for all lobby UI */
@@ -117,6 +118,7 @@ export function showHostLobby(
         Start Game
       </button>
       <p id="start-hint" style="opacity:0.5;font-size:12px;margin-top:8px;">Need at least 1 player on each team</p>
+      ${CHAT_HTML}
     </div>
   `;
 
@@ -134,6 +136,8 @@ export function showHostLobby(
   document.getElementById('btn-start')!.addEventListener('click', () => {
     callbacks.onStartGame();
   });
+
+  addChatUI(callbacks);
 }
 
 /** Show the client lobby screen (waiting for host to start) */
@@ -152,6 +156,7 @@ export function showClientLobby(players: LobbyPlayer[], callbacks: LobbyUICallba
       </div>
 
       <p style="opacity:0.6;font-size:14px;">Waiting for host to start...</p>
+      ${CHAT_HTML}
     </div>
   `;
 
@@ -166,6 +171,8 @@ export function showClientLobby(players: LobbyPlayer[], callbacks: LobbyUICallba
     callbacks.onTeamChange('blue');
     updateTeamButtons('blue');
   });
+
+  addChatUI(callbacks);
 }
 
 /** Update the player list in whichever lobby screen is showing */
@@ -249,4 +256,46 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+const CHAT_HTML = `
+  <div id="lobby-chat" style="margin-top:16px;text-align:left;">
+    <div id="chat-messages" style="height:120px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;font-size:13px;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:6px;">
+      <input id="chat-input" type="text" maxlength="100" placeholder="Type a message..."
+        style="flex:1;padding:8px;font-size:13px;border-radius:6px;border:1px solid #444;background:#2a2a4a;color:#fff;">
+      <button id="btn-chat-send" style="padding:8px 16px;border:none;border-radius:6px;background:#457b9d;color:#fff;cursor:pointer;font-weight:bold;">Send</button>
+    </div>
+  </div>
+`;
+
+function addChatUI(callbacks: LobbyUICallbacks): void {
+  const input = document.getElementById('chat-input') as HTMLInputElement | null;
+  const btn = document.getElementById('btn-chat-send');
+  if (!input || !btn) return;
+
+  const send = () => {
+    const text = input.value.trim();
+    if (text && callbacks.onChat) {
+      callbacks.onChat(text);
+      input.value = '';
+    }
+  };
+
+  btn.addEventListener('click', send);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') send();
+  });
+}
+
+/** Append a chat message to the lobby chat box */
+export function appendChatMessage(name: string, text: string): void {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  const msg = document.createElement('div');
+  msg.style.cssText = 'padding:2px 0;word-break:break-word;';
+  msg.innerHTML = `<strong style="color:#74c0fc;">${escapeHtml(name)}:</strong> ${escapeHtml(text)}`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
 }

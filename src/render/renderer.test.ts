@@ -69,8 +69,8 @@ describe('Renderer state snapshots', () => {
 
   it('game-over state: phase is ended at match end', () => {
     const state = createGameState(1, 1);
-    // Full match: 300 seconds = 18000 ticks + kickoff ticks (180 + potentially more after halftime/goals)
-    advanceTicks(state, 20000);
+    // Full match + overtime (0-0 triggers sudden death): ~300 + 60 seconds + kickoff ticks
+    advanceTicks(state, 24000);
 
     expect(state.phase).toBe('ended');
     expect(state.matchTime).toBeLessThanOrEqual(0);

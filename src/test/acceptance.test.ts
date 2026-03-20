@@ -346,6 +346,29 @@ describe('Acceptance: Player Collision Integrity', () => {
   });
 });
 
+describe('Acceptance: Overtime', () => {
+  it('tied match enters sudden death overtime', () => {
+    // Use idle bots → 0-0 → should trigger overtime
+    const state = createShortGame(1, 1, SHORT_MATCH_SECONDS);
+    const maxTicks = Math.ceil(SHORT_MATCH_SECONDS * TICK_RATE * 3) + KICKOFF_COUNTDOWN_TICKS * 100;
+
+    let overtimeReached = false;
+    for (let i = 0; i < maxTicks; i++) {
+      simulateTick(
+        state,
+        allPlayersInput(state, () => ({ dx: 0, dy: 0, kick: false })),
+      );
+      if (state.inOvertime) {
+        overtimeReached = true;
+      }
+      if (state.phase === 'ended') break;
+    }
+
+    expect(overtimeReached).toBe(true);
+    expect(state.phase).toBe('ended');
+  });
+});
+
 describe('Acceptance: Edge Cases', () => {
   it('1v1 with attackers completes', () => {
     const state = simulateMatch(1, 1, attackInput);

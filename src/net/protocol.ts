@@ -41,7 +41,7 @@ export function decodeInput(buf: ArrayBuffer): { seq: number; input: InputFrame 
 //     pos.x:f32 | pos.y:f32 | vel.x:f32 | vel.y:f32 ]
 // Followed by player count: u8 after header+ball
 
-const HEADER_SIZE = 21;
+const HEADER_SIZE = 22; // +1 byte for inOvertime flag
 const BALL_SIZE = 16;
 const PLAYER_SIZE = 24; // id:1 + team:1 + onField:1 + benchedAtTick:4 + cooldown:1 + pos:8 + vel:8
 
@@ -84,6 +84,8 @@ export function encodeState(seq: number, snapshot: StateSnapshot): ArrayBuffer {
   off += 1;
   view.setFloat32(off, snapshot.lastSubstitutionTime, true);
   off += 4;
+  view.setUint8(off, snapshot.inOvertime ? 1 : 0);
+  off += 1;
 
   // Player count
   view.setUint8(off, playerCount);
@@ -149,6 +151,8 @@ export function decodeState(buf: ArrayBuffer): { seq: number; snapshot: StateSna
   off += 1;
   const lastSubstitutionTime = view.getFloat32(off, true);
   off += 4;
+  const inOvertime = view.getUint8(off) !== 0;
+  off += 1;
 
   const playerCount = view.getUint8(off);
   off += 1;
@@ -198,6 +202,7 @@ export function decodeState(buf: ArrayBuffer): { seq: number; snapshot: StateSna
       scoreBlue,
       halfSwapped,
       lastSubstitutionTime,
+      inOvertime,
       players,
       ball,
       timestamp: 0,

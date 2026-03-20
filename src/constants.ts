@@ -40,6 +40,7 @@ export const TICK_DURATION = 1000 / TICK_RATE;
 export const MATCH_DURATION_SECONDS = 300; // 5 minutes
 export const HALFTIME_SECONDS = MATCH_DURATION_SECONDS / 2;
 export const KICKOFF_COUNTDOWN_TICKS = 180; // 3 seconds
+export const OVERTIME_DURATION_SECONDS = 60; // 1 minute sudden death
 
 // === Networking ===
 export const STATE_BROADCAST_RATE = 20; // Hz — host broadcasts state snapshots

@@ -7,6 +7,7 @@ import {
   TICK_RATE,
   KICKOFF_COUNTDOWN_TICKS,
   MATCH_DURATION_SECONDS,
+  OVERTIME_DURATION_SECONDS,
   KICK_RANGE,
   PLAYER_RADIUS,
   MAX_ON_FIELD_PER_TEAM,
@@ -201,12 +202,62 @@ describe('Game Over', () => {
     const state = createGameState(1, 1);
     skipKickoff(state);
 
-    const totalTicks = Math.ceil(MATCH_DURATION_SECONDS * TICK_RATE) + 100;
+    // With 0-0, regulation triggers overtime. Run through regulation + overtime.
+    const totalTicks =
+      Math.ceil((MATCH_DURATION_SECONDS + OVERTIME_DURATION_SECONDS) * TICK_RATE) + 500;
     for (let i = 0; i < totalTicks; i++) {
       simulateTick(state, noInput());
       if (state.phase === 'kickoff') skipKickoff(state);
       if (state.phase === 'ended') break;
     }
+
+    expect(state.phase).toBe('ended');
+    expect(state.matchTime).toBe(0);
+  });
+
+  it('goes to overtime on tied score', () => {
+    const state = createGameState(1, 1);
+    skipKickoff(state);
+
+    // Run through regulation with 0-0 score
+    const regTicks = Math.ceil(MATCH_DURATION_SECONDS * TICK_RATE) + 100;
+    for (let i = 0; i < regTicks; i++) {
+      simulateTick(state, noInput());
+      if (state.phase === 'kickoff') {
+        // Check if we entered overtime
+        if (state.inOvertime) break;
+        skipKickoff(state);
+      }
+    }
+
+    expect(state.inOvertime).toBe(true);
+  });
+
+  it('ends immediately on golden goal in overtime', () => {
+    const state = createGameState(1, 1);
+    state.inOvertime = true;
+    state.halfSwapped = true;
+    state.matchTime = 30;
+    state.phase = 'playing';
+
+    // Score a goal
+    state.ball.position = { x: FIELD_WIDTH - 5, y: FIELD_HEIGHT / 2 };
+    state.ball.velocity = { x: 10, y: 0 };
+    simulateTick(state, noInput());
+
+    expect(state.scoreRed).toBe(1);
+    expect(state.phase).toBe('ended');
+    expect(state.matchTime).toBe(0);
+  });
+
+  it('ends as draw if no goals in overtime', () => {
+    const state = createGameState(1, 1);
+    state.inOvertime = true;
+    state.halfSwapped = true;
+    state.matchTime = 1 / TICK_RATE; // 1 tick left
+    state.phase = 'playing';
+
+    simulateTick(state, noInput());
 
     expect(state.phase).toBe('ended');
     expect(state.matchTime).toBe(0);
