@@ -1,4 +1,5 @@
 import Peer, { type DataConnection } from 'peerjs';
+import { getPeerConfig } from './peer-config';
 import { INTERPOLATION_BUFFER_MS } from '../constants';
 import { encodeInput, decodeState } from './protocol';
 import { vec2Lerp } from '../util/math';
@@ -80,7 +81,7 @@ export class GameClient {
   }
 
   private tryConnect(hostPeerId: string): Promise<void> {
-    this.peer = new Peer();
+    this.peer = new Peer(getPeerConfig());
     return new Promise((resolve, reject) => {
       let settled = false;
 

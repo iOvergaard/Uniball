@@ -1,4 +1,5 @@
 import Peer, { type DataConnection } from 'peerjs';
+import { getPeerConfig } from './peer-config';
 import { TICK_RATE, TICK_DURATION, STATE_BROADCAST_RATE, INPUT_BUFFER_TICKS } from '../constants';
 import { createGameState, simulateTick, removePlayer } from '../physics/engine';
 import { encodeState } from './protocol';
@@ -51,7 +52,7 @@ export class GameHost {
   constructor(private callbacks: HostCallbacks) {}
 
   async start(): Promise<void> {
-    this.peer = new Peer();
+    this.peer = new Peer(getPeerConfig());
     return new Promise((resolve, reject) => {
       this.peer!.on('open', (id) => {
         this.callbacks.onReady(id);
