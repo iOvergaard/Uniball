@@ -6,7 +6,16 @@ import { resizeCanvas } from './render/camera';
 import { initInput, readInputP1, readInputP2, readInput } from './input/input';
 import { GameHost } from './net/host';
 import { GameClient } from './net/client';
-import type { GameState, InputFrame } from './types';
+import {
+  showLandingScreen,
+  showHostLobby,
+  showClientLobby,
+  updateLobbyPlayers,
+  hideLobby,
+  showLobbyStatus,
+} from './ui/lobby-ui';
+import { showDisconnected } from './ui/screens';
+import type { GameState, InputFrame, LobbyPlayer, Team } from './types';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -19,18 +28,24 @@ window.addEventListener('resize', () => {
 initInput();
 
 // --- Mode detection from URL hash ---
-// #host         → create a room as host
-// #room=<id>    → join room as client
-// (no hash)     → local 2-player mode
+// #room=<id>  → show landing with join pre-filled
+// (anything)  → show landing screen
 const hash = window.location.hash;
+const roomIdFromHash = hash.startsWith('#room=') ? hash.slice(6) : undefined;
 
-if (hash.startsWith('#room=')) {
-  startClientMode(hash.slice(6));
-} else if (hash === '#host') {
-  startHostMode();
-} else {
-  startLocalMode();
-}
+showLandingScreen(
+  {
+    onCreateRoom: (name) => startHostMode(name),
+    onJoinRoom: (name, roomId) => startClientMode(name, roomId),
+    onLocalPlay: () => {
+      hideLobby();
+      startLocalMode();
+    },
+    onTeamChange: () => {},
+    onStartGame: () => {},
+  },
+  roomIdFromHash,
+);
 
 // === Local Mode (Phase 2 — same keyboard, two players) ===
 function startLocalMode(): void {
@@ -60,56 +75,53 @@ function startLocalMode(): void {
 }
 
 // === Host Mode ===
-function startHostMode(): void {
-  const statusEl = showStatus('Creating room...');
+function startHostMode(hostName: string): void {
+  showLobbyStatus('Creating room...');
+
+  let currentTeam: Team = 'red';
 
   const host = new GameHost({
     onReady: (peerId) => {
       const url = `${window.location.origin}${window.location.pathname}#room=${peerId}`;
-      statusEl.innerHTML = `
-        <div style="text-align:center;color:#fff;font-family:sans-serif;">
-          <h2>Room Ready</h2>
-          <p>Share this link:</p>
-          <input id="room-link" type="text" value="${url}" readonly
-            style="width:400px;padding:8px;font-size:14px;text-align:center;cursor:pointer;"
-            onclick="this.select()">
-          <p id="player-count">Players: 1 (Host)</p>
-          <button id="start-btn" style="padding:12px 24px;font-size:16px;cursor:pointer;margin-top:16px;">
-            Start Game
-          </button>
-        </div>
-      `;
+      host.setHostName(hostName);
+      host.setHostTeam(currentTeam);
 
-      document.getElementById('start-btn')!.addEventListener('click', () => {
-        host.startGame();
+      showHostLobby(url, host.getLobbyPlayers(), {
+        onCreateRoom: () => {},
+        onJoinRoom: () => {},
+        onLocalPlay: () => {},
+        onTeamChange: (team: Team) => {
+          currentTeam = team;
+          host.setHostTeam(team);
+          updateLobbyPlayers(host.getLobbyPlayers());
+        },
+        onStartGame: () => {
+          host.startGame();
+        },
       });
     },
-    onPlayerJoin: (_player) => {
-      const players = host.getLobbyPlayers();
-      updatePlayerCount(players.length);
+    onPlayerJoin: (_player: LobbyPlayer) => {
+      updateLobbyPlayers(host.getLobbyPlayers());
     },
     onPlayerLeave: () => {
-      const players = host.getLobbyPlayers();
-      updatePlayerCount(players.length);
+      updateLobbyPlayers(host.getLobbyPlayers());
     },
     onGameStart: () => {
-      removeStatus();
+      hideLobby();
       startHostGameLoop(host);
     },
     onTick: () => {},
   });
 
   host.start().catch((err) => {
-    statusEl.textContent = `Error: ${err.message}`;
+    showLobbyStatus(`Error: ${err.message}`);
   });
 }
 
 function startHostGameLoop(host: GameHost): void {
   function loop(): void {
-    // Read host's local input and send to host
     host.setHostInput(readInput());
 
-    // Render the authoritative state
     const state = host.getState();
     if (state) {
       render(ctx, state, camera);
@@ -122,43 +134,49 @@ function startHostGameLoop(host: GameHost): void {
 }
 
 // === Client Mode ===
-function startClientMode(hostPeerId: string): void {
-  const statusEl = showStatus('Connecting...');
+function startClientMode(playerName: string, hostPeerId: string): void {
+  showLobbyStatus('Connecting...');
+
   let gameStarted = false;
   let renderState: GameState | null = null;
 
   const client = new GameClient({
     onConnected: () => {
-      statusEl.textContent = 'Connected! Joining...';
-      client.join('Player');
+      client.join(playerName);
     },
     onWelcome: (_playerId) => {
-      statusEl.textContent = 'Waiting for host to start...';
+      showClientLobby([], {
+        onCreateRoom: () => {},
+        onJoinRoom: () => {},
+        onLocalPlay: () => {},
+        onTeamChange: (team: Team) => {
+          client.setTeam(team);
+        },
+        onStartGame: () => {},
+      });
     },
-    onPlayerList: (_players) => {},
+    onPlayerList: (players: LobbyPlayer[]) => {
+      updateLobbyPlayers(players);
+    },
     onGameStart: () => {
       gameStarted = true;
-      removeStatus();
+      hideLobby();
     },
-    onStateUpdate: (state) => {
+    onStateUpdate: (state: GameState) => {
       renderState = state;
     },
     onDisconnect: () => {
-      showStatus('Disconnected from host');
+      showDisconnected();
     },
   });
 
   client.connect(hostPeerId).catch((err) => {
-    statusEl.textContent = `Connection failed: ${err.message}`;
+    showLobbyStatus(`Connection failed: ${err.message}`);
   });
 
-  // Client render + input loop
   function loop(): void {
     if (gameStarted) {
-      // Send local input to host
       client.sendInput(readInput());
-
-      // Re-interpolate for smooth rendering even between server updates
       client.interpolate();
 
       if (renderState) {
@@ -170,27 +188,4 @@ function startClientMode(hostPeerId: string): void {
   }
 
   requestAnimationFrame(loop);
-}
-
-// === UI Helpers ===
-function showStatus(text: string): HTMLDivElement {
-  let el = document.getElementById('status-overlay') as HTMLDivElement | null;
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'status-overlay';
-    el.style.cssText =
-      'position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:100;color:#fff;font-family:sans-serif;font-size:20px;';
-    document.body.appendChild(el);
-  }
-  el.textContent = text;
-  return el;
-}
-
-function removeStatus(): void {
-  document.getElementById('status-overlay')?.remove();
-}
-
-function updatePlayerCount(count: number): void {
-  const el = document.getElementById('player-count');
-  if (el) el.textContent = `Players: ${count}`;
 }
