@@ -10,7 +10,12 @@ import { fitCamera } from './camera';
  * so the renderer has the right data.
  */
 
-function makeInputs(state: GameState, dx: number, dy: number, kick: boolean): Map<number, InputFrame> {
+function makeInputs(
+  state: GameState,
+  dx: number,
+  dy: number,
+  kick: boolean,
+): Map<number, InputFrame> {
   const inputs = new Map<number, InputFrame>();
   for (let i = 0; i < state.players.length; i++) {
     if (state.players[i].onField) {
