@@ -1,6 +1,7 @@
 import { TICK_DURATION } from './constants';
 import { createGameState, simulateTick } from './physics/engine';
 import { render } from './render/renderer';
+import { renderTouchOverlay } from './render/touch-overlay';
 import { resizeCanvas } from './render/camera';
 import { initInput, readInput } from './input/input';
 
@@ -36,6 +37,7 @@ function loop(now: number): void {
   }
 
   render(ctx, state, camera);
+  renderTouchOverlay(ctx);
   requestAnimationFrame(loop);
 }
 
