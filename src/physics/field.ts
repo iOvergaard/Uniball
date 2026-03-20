@@ -32,21 +32,21 @@ export function getStartingPositions(team: Team, count: number, halfSwapped: boo
   return positions;
 }
 
-/** Reset all players to starting positions and zero velocity. */
+/** Reset on-field players to starting positions and zero velocity. */
 export function resetPlayersToPositions(players: PlayerState[], halfSwapped: boolean): void {
-  const redPlayers = players.filter((p) => p.team === 'red');
-  const bluePlayers = players.filter((p) => p.team === 'blue');
+  const redOnField = players.filter((p) => p.team === 'red' && p.onField);
+  const blueOnField = players.filter((p) => p.team === 'blue' && p.onField);
 
-  const redPositions = getStartingPositions('red', redPlayers.length, halfSwapped);
-  const bluePositions = getStartingPositions('blue', bluePlayers.length, halfSwapped);
+  const redPositions = getStartingPositions('red', redOnField.length, halfSwapped);
+  const bluePositions = getStartingPositions('blue', blueOnField.length, halfSwapped);
 
-  redPlayers.forEach((p, i) => {
+  redOnField.forEach((p, i) => {
     p.position = redPositions[i];
     p.velocity = { x: 0, y: 0 };
     p.kickCooldown = 0;
   });
 
-  bluePlayers.forEach((p, i) => {
+  blueOnField.forEach((p, i) => {
     p.position = bluePositions[i];
     p.velocity = { x: 0, y: 0 };
     p.kickCooldown = 0;

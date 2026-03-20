@@ -93,7 +93,7 @@ function drawBall(ctx: CanvasRenderingContext2D, state: GameState): void {
 }
 
 function drawPlayers(ctx: CanvasRenderingContext2D, state: GameState): void {
-  for (const player of state.players) {
+  for (const player of state.players.filter((p) => p.onField)) {
     const color = player.team === 'red' ? RED_TEAM_COLOR : BLUE_TEAM_COLOR;
 
     // Shadow
@@ -177,6 +177,24 @@ function drawHUD(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+  }
+
+  // Bench indicators
+  const redReserves = state.players.filter((p) => p.team === 'red' && !p.onField).length;
+  const blueReserves = state.players.filter((p) => p.team === 'blue' && !p.onField).length;
+  if (redReserves > 0 || blueReserves > 0) {
+    ctx.font = '12px sans-serif';
+    ctx.textBaseline = 'top';
+    if (redReserves > 0) {
+      ctx.fillStyle = RED_TEAM_COLOR;
+      ctx.textAlign = 'left';
+      ctx.fillText(`Bench: ${redReserves}`, 4, FIELD_HEIGHT + 6);
+    }
+    if (blueReserves > 0) {
+      ctx.fillStyle = BLUE_TEAM_COLOR;
+      ctx.textAlign = 'right';
+      ctx.fillText(`Bench: ${blueReserves}`, FIELD_WIDTH - 4, FIELD_HEIGHT + 6);
+    }
   }
 
   if (state.phase === 'ended') {

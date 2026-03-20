@@ -9,6 +9,8 @@ import {
   MATCH_DURATION_SECONDS,
   KICK_RANGE,
   PLAYER_RADIUS,
+  MAX_ON_FIELD_PER_TEAM,
+  SUBSTITUTION_INTERVAL_SECONDS,
 } from '../constants';
 
 function noInput(): Map<number, InputFrame> {
@@ -225,5 +227,93 @@ describe('Player-Player Collision', () => {
       state.players[0].position.y - state.players[1].position.y,
     );
     expect(dist).toBeGreaterThanOrEqual(PLAYER_RADIUS * 2 - 1);
+  });
+});
+
+describe('Reserve Players and Substitutions', () => {
+  it('caps on-field players at MAX_ON_FIELD_PER_TEAM', () => {
+    const state = createGameState(6, 5);
+    const redOnField = state.players.filter((p) => p.team === 'red' && p.onField);
+    const blueOnField = state.players.filter((p) => p.team === 'blue' && p.onField);
+    expect(redOnField).toHaveLength(MAX_ON_FIELD_PER_TEAM);
+    expect(blueOnField).toHaveLength(MAX_ON_FIELD_PER_TEAM);
+  });
+
+  it('puts excess players on the bench', () => {
+    const state = createGameState(6, 5);
+    const redReserves = state.players.filter((p) => p.team === 'red' && !p.onField);
+    const blueReserves = state.players.filter((p) => p.team === 'blue' && !p.onField);
+    expect(redReserves).toHaveLength(2);
+    expect(blueReserves).toHaveLength(1);
+  });
+
+  it('supports unequal team sizes', () => {
+    const state = createGameState(7, 3);
+    expect(state.players.filter((p) => p.team === 'red')).toHaveLength(7);
+    expect(state.players.filter((p) => p.team === 'blue')).toHaveLength(3);
+    expect(state.players.filter((p) => p.team === 'red' && p.onField)).toHaveLength(
+      MAX_ON_FIELD_PER_TEAM,
+    );
+    expect(state.players.filter((p) => p.team === 'blue' && p.onField)).toHaveLength(3);
+  });
+
+  it('performs forced substitution after interval', () => {
+    const state = createGameState(6, 6);
+    skipKickoff(state);
+
+    // Record who is initially on field for red
+    const initialRedOnField = state.players
+      .filter((p) => p.team === 'red' && p.onField)
+      .map((p) => p.id);
+
+    // Fast-forward past the substitution interval
+    const ticksToSub = Math.ceil(SUBSTITUTION_INTERVAL_SECONDS * TICK_RATE) + 10;
+    for (let i = 0; i < ticksToSub; i++) {
+      simulateTick(state, noInput());
+      if (state.phase === 'kickoff') skipKickoff(state);
+    }
+
+    // After substitution, the roster should have rotated
+    const newRedOnField = state.players
+      .filter((p) => p.team === 'red' && p.onField)
+      .map((p) => p.id);
+
+    // Still max players on field
+    expect(newRedOnField).toHaveLength(MAX_ON_FIELD_PER_TEAM);
+    // At least one player should have changed
+    expect(newRedOnField).not.toEqual(initialRedOnField);
+  });
+
+  it('does not substitute when team has no reserves', () => {
+    const state = createGameState(2, 2);
+    skipKickoff(state);
+
+    const initialIds = state.players.filter((p) => p.onField).map((p) => p.id);
+
+    // Fast-forward past the substitution interval
+    const ticksToSub = Math.ceil(SUBSTITUTION_INTERVAL_SECONDS * TICK_RATE) + 10;
+    for (let i = 0; i < ticksToSub; i++) {
+      simulateTick(state, noInput());
+      if (state.phase === 'kickoff') skipKickoff(state);
+    }
+
+    const afterIds = state.players.filter((p) => p.onField).map((p) => p.id);
+
+    expect(afterIds).toEqual(initialIds);
+  });
+
+  it('total player count stays the same after substitutions', () => {
+    const state = createGameState(7, 7);
+    skipKickoff(state);
+
+    const totalBefore = state.players.length;
+
+    const ticksToSub = Math.ceil(SUBSTITUTION_INTERVAL_SECONDS * TICK_RATE) + 10;
+    for (let i = 0; i < ticksToSub; i++) {
+      simulateTick(state, noInput());
+      if (state.phase === 'kickoff') skipKickoff(state);
+    }
+
+    expect(state.players).toHaveLength(totalBefore);
   });
 });
