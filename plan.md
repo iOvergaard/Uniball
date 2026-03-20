@@ -234,6 +234,40 @@ interface InputFrame {
 5. **Phase 5**: Visual inspection — field lines, colors, animations, responsive scaling
 6. **Phase 6**: Close a tab mid-game, verify graceful handling
 
+## Automated Acceptance Testing Strategy
+
+The unit tests in `engine.test.ts` validate physics and game logic in isolation. As the project grows, we need automated acceptance tests that simulate actual multiplayer gameplay end-to-end.
+
+### Current: Headless Playtests (Phase 1-2)
+
+Run the physics engine with scripted inputs (no browser needed). These tests verify:
+
+- Two players moving and kicking independently
+- Full match flow: kickoff → goals → halftime → substitutions → game over
+- Edge cases: collisions, wall bounces, reserves rotating in
+
+These run on every PR via CI (`npm run test`).
+
+### Next: Simulated Multiplayer (Phase 3+)
+
+Once networking is in place, add integration tests that:
+
+- Spin up a headless host game loop
+- Connect 2+ simulated clients that send scripted `InputFrame` sequences
+- Verify that host state broadcasts arrive at clients and state converges
+- Test disconnect/reconnect scenarios (Phase 6)
+
+**Approach**: Create a `test/acceptance/` directory with Vitest tests that import `game-host.ts` and `game-client.ts` directly (no browser). Mock the PeerJS transport layer with in-memory message passing so tests run fast and deterministically.
+
+### Continuous Improvement
+
+Every phase should add acceptance tests alongside feature code:
+
+- **Phase 3**: Host broadcasts state, client receives and interpolates, input round-trip works
+- **Phase 4**: Lobby → team pick → match start → full game with 4+ simulated players
+- **Phase 5**: No automated visual tests, but snapshot-test the game state at key moments (goal scored, halftime, substitution)
+- **Phase 6**: Player disconnect mid-game triggers reserve sub-in; host disconnect ends game for all clients
+
 ## Estimated Size
 
 ~2000-2500 lines of TypeScript. Largest files: `engine.ts` (~250), `renderer.ts` (~250), `game-host.ts` (~150), `lobby-ui.ts` (~200).
