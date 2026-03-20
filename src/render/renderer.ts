@@ -24,37 +24,50 @@ interface AnimState {
   prevScoreRed: number;
   prevScoreBlue: number;
   prevPhase: string;
+  prevHalfSwapped: boolean;
   prevLastSubTime: number;
   goalFlashTimer: number;
   goalFlashTeam: 'red' | 'blue' | null;
   halftimeTimer: number;
   subAnnouncementTimer: number;
-  initialized: boolean;
+  prevTick: number;
 }
 
-const anim: AnimState = {
-  prevScoreRed: 0,
-  prevScoreBlue: 0,
-  prevPhase: '',
-  prevLastSubTime: 0,
-  goalFlashTimer: 0,
-  goalFlashTeam: null,
-  halftimeTimer: 0,
-  subAnnouncementTimer: 0,
-  initialized: false,
-};
+function freshAnim(): AnimState {
+  return {
+    prevScoreRed: 0,
+    prevScoreBlue: 0,
+    prevPhase: '',
+    prevHalfSwapped: false,
+    prevLastSubTime: 0,
+    goalFlashTimer: 0,
+    goalFlashTeam: null,
+    halftimeTimer: 0,
+    subAnnouncementTimer: 0,
+    prevTick: -1,
+  };
+}
+
+let anim: AnimState = freshAnim();
 
 const GOAL_FLASH_DURATION = 60; // frames
 const HALFTIME_DISPLAY_DURATION = 120;
 const SUB_ANNOUNCEMENT_DURATION = 90;
 
 function detectEvents(state: GameState): void {
-  if (!anim.initialized) {
+  // Reset anim state when a new match starts (tick resets to 0 or goes backwards)
+  if (state.tick <= anim.prevTick && anim.prevTick > 0) {
+    anim = freshAnim();
+  }
+
+  // First frame: seed prev values without triggering animations
+  if (anim.prevTick < 0) {
     anim.prevScoreRed = state.scoreRed;
     anim.prevScoreBlue = state.scoreBlue;
     anim.prevPhase = state.phase;
+    anim.prevHalfSwapped = state.halfSwapped;
     anim.prevLastSubTime = state.lastSubstitutionTime;
-    anim.initialized = true;
+    anim.prevTick = state.tick;
     return;
   }
 
@@ -67,8 +80,8 @@ function detectEvents(state: GameState): void {
     anim.goalFlashTeam = 'blue';
   }
 
-  // Halftime started
-  if (state.phase === 'halftime' && anim.prevPhase !== 'halftime') {
+  // Halftime: detect via halfSwapped transitioning false→true
+  if (state.halfSwapped && !anim.prevHalfSwapped) {
     anim.halftimeTimer = HALFTIME_DISPLAY_DURATION;
   }
 
@@ -80,7 +93,9 @@ function detectEvents(state: GameState): void {
   anim.prevScoreRed = state.scoreRed;
   anim.prevScoreBlue = state.scoreBlue;
   anim.prevPhase = state.phase;
+  anim.prevHalfSwapped = state.halfSwapped;
   anim.prevLastSubTime = state.lastSubstitutionTime;
+  anim.prevTick = state.tick;
 }
 
 function tickAnimations(): void {

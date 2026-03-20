@@ -29,6 +29,21 @@ export function showDisconnected(): void {
   `;
 }
 
+export function showGameOver(): void {
+  const el = getOverlay();
+  el.style.pointerEvents = 'auto';
+  // Position at bottom center, transparent background (canvas draws the game-over text)
+  el.style.background = 'none';
+  el.style.alignItems = 'flex-end';
+  el.style.paddingBottom = '60px';
+  el.innerHTML = `
+    <button onclick="location.hash='';location.reload()"
+      style="padding:12px 24px;font-size:16px;border:none;border-radius:8px;background:rgba(69,123,157,0.9);color:#fff;cursor:pointer;">
+      Back to Menu
+    </button>
+  `;
+}
+
 export function hideOverlay(): void {
   if (overlay) {
     overlay.remove();

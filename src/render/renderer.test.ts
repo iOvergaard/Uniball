@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState, simulateTick } from '../physics/engine';
+import { FIELD_WIDTH } from '../constants';
 import type { InputFrame, GameState } from '../types';
 import { fitCamera } from './camera';
 
@@ -17,9 +18,9 @@ function makeInputs(
   kick: boolean,
 ): Map<number, InputFrame> {
   const inputs = new Map<number, InputFrame>();
-  for (let i = 0; i < state.players.length; i++) {
-    if (state.players[i].onField) {
-      inputs.set(i, { dx, dy, kick });
+  for (const player of state.players) {
+    if (player.onField) {
+      inputs.set(player.id, { dx, dy, kick });
     }
   }
   return inputs;
@@ -52,15 +53,18 @@ describe('Renderer state snapshots', () => {
     expect(state.kickoffCountdown).toBe(0);
   });
 
-  it('halftime state snapshot: phase changes and sides swap', () => {
+  it('halftime state snapshot: halfSwapped transitions and phase goes to kickoff', () => {
     const state = createGameState(1, 1);
     expect(state.halfSwapped).toBe(false);
 
     // Advance to halftime (150 seconds = 9000 ticks + 180 kickoff ticks)
     advanceTicks(state, 9180);
 
-    // Should be at or past halftime
+    // Should be at or past halftime — engine sets halfSwapped=true and phase='kickoff'
     expect(state.halfSwapped).toBe(true);
+    // Engine does NOT set phase='halftime' — it goes directly to 'kickoff' for the restart
+    // The renderer detects halftime via the halfSwapped false→true transition
+    expect(state.phase).not.toBe('halftime');
   });
 
   it('game-over state: phase is ended at match end', () => {
@@ -151,7 +155,7 @@ describe('Camera', () => {
   it('centers the field horizontally', () => {
     const cam = fitCamera(1920, 1080);
     // offsetX should center: (1920 - FIELD_WIDTH * scale) / 2
-    const expectedX = (1920 - 840 * cam.scale) / 2;
+    const expectedX = (1920 - FIELD_WIDTH * cam.scale) / 2;
     expect(cam.offsetX).toBeCloseTo(expectedX, 1);
   });
 });

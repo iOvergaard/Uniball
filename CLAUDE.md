@@ -32,15 +32,31 @@ npm run check        # All checks: fmt + lint + types
 
 ```
 src/
-  main.ts            — Entry point
-  constants.ts       — All magic numbers
-  types.ts           — Shared type definitions
+  main.ts            — Entry point, mode routing (local/host/client)
+  constants.ts       — All magic numbers (field, physics, timing, networking)
+  types.ts           — Shared type definitions (game state, networking, lobby)
   physics/           — Game simulation (engine, collision, field)
-  render/            — Canvas 2D drawing (renderer, hud, camera)
-  net/               — PeerJS networking (host, client, protocol, lobby)
-  input/             — Keyboard/mouse input capture
-  game/              — Game loops (host + client), rules, state
-  ui/                — DOM-based UI (lobby, HUD, screens)
+    engine.ts        — Fixed-timestep physics, substitution, scoring
+    engine.test.ts   — 27 unit tests
+    collision.ts     — Circle-circle and circle-wall resolution
+    field.ts         — Field geometry, goal detection, positioning
+  render/            — Canvas 2D drawing
+    renderer.ts      — Field, unicorn avatars, ball, HUD, animations, overlays
+    renderer.test.ts — 11 snapshot + camera tests
+    camera.ts        — Viewport scaling, DPR, HUD-aware resize
+    touch-overlay.ts — Touch joystick controls
+  net/               — PeerJS networking
+    host.ts          — Host: connections, physics loop, state broadcast
+    client.ts        — Client: input send, state receive, interpolation
+    protocol.ts      — Binary encoding/decoding (input 12B, state ~230B)
+    protocol.test.ts — 14 round-trip tests
+    lobby.test.ts    — 13 lobby + multiplayer simulation tests
+  input/             — Keyboard/touch input capture
+  ui/                — DOM-based UI
+    lobby-ui.ts      — Landing, host lobby, client lobby screens
+    screens.ts       — Disconnect + game-over overlays
+  test/              — Acceptance tests
+    acceptance.test.ts — 17 bot-driven full match simulations
   util/              — Vec2 math helpers
 ```
 
@@ -50,5 +66,7 @@ src/
 - Types shared between host and client go in `src/types.ts`
 - Binary protocol definitions in `src/net/protocol.ts`
 - Host is authoritative — clients never mutate game state directly
-- Player avatars are unicorns with team-colored circles
+- Player avatars are hand-drawn unicorns (horn, head, rainbow mane) with team-colored circles
+- Renderer animation state resets automatically on new match (tick-based detection)
+- Engine never sets phase='halftime' — halftime is detected via halfSwapped transition
 - Run `npm run check` before committing to ensure formatting, lint, and types pass

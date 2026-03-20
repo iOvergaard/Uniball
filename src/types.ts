@@ -72,5 +72,5 @@ export type LobbyMessage =
   | { type: 'join'; name: string }
   | { type: 'welcome'; playerId: number }
   | { type: 'team'; team: Team }
-  | { type: 'start' }
+  | { type: 'start'; playerNames: Record<number, string> }
   | { type: 'playerList'; players: LobbyPlayer[] };

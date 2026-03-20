@@ -14,7 +14,7 @@ import {
   hideLobby,
   showLobbyStatus,
 } from './ui/lobby-ui';
-import { showDisconnected } from './ui/screens';
+import { showDisconnected, showGameOver } from './ui/screens';
 import type { GameState, InputFrame, LobbyPlayer, Team } from './types';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -52,6 +52,7 @@ function startLocalMode(): void {
   const state = createGameState(1, 1);
   let lastTime = performance.now();
   let accumulator = 0;
+  let gameOverShown = false;
 
   function loop(now: number): void {
     const dt = now - lastTime;
@@ -67,6 +68,10 @@ function startLocalMode(): void {
     }
 
     render(ctx, state, camera);
+    if (state.phase === 'ended' && !gameOverShown) {
+      gameOverShown = true;
+      showGameOver();
+    }
     renderTouchOverlay(ctx);
     requestAnimationFrame(loop);
   }
@@ -119,12 +124,18 @@ function startHostMode(hostName: string): void {
 }
 
 function startHostGameLoop(host: GameHost): void {
+  let gameOverShown = false;
+
   function loop(): void {
     host.setHostInput(readInput());
 
     const state = host.getState();
     if (state) {
       render(ctx, state, camera);
+      if (state.phase === 'ended' && !gameOverShown) {
+        gameOverShown = true;
+        showGameOver();
+      }
     }
     renderTouchOverlay(ctx);
     requestAnimationFrame(loop);
@@ -138,6 +149,7 @@ function startClientMode(playerName: string, hostPeerId: string): void {
   showLobbyStatus('Connecting...');
 
   let gameStarted = false;
+  let gameOverShown = false;
   let renderState: GameState | null = null;
 
   const client = new GameClient({
@@ -181,6 +193,10 @@ function startClientMode(playerName: string, hostPeerId: string): void {
 
       if (renderState) {
         render(ctx, renderState, camera);
+        if (renderState.phase === 'ended' && !gameOverShown) {
+          gameOverShown = true;
+          showGameOver();
+        }
       }
     }
     renderTouchOverlay(ctx);

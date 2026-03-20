@@ -22,6 +22,7 @@ export class GameClient {
   // Interpolation buffer: keep recent snapshots sorted by timestamp
   private snapshots: StateSnapshot[] = [];
   private renderState: GameState | null = null;
+  private playerNames: Record<number, string> = {};
 
   constructor(private callbacks: ClientCallbacks) {}
 
@@ -90,6 +91,7 @@ export class GameClient {
         this.callbacks.onPlayerList(msg.players);
         break;
       case 'start':
+        this.playerNames = msg.playerNames;
         this.callbacks.onGameStart();
         break;
     }
@@ -155,6 +157,13 @@ export class GameClient {
     this.callbacks.onStateUpdate(this.renderState);
   }
 
+  private applyNames(players: StateSnapshot['players']): StateSnapshot['players'] {
+    return players.map((p) => ({
+      ...p,
+      name: this.playerNames[p.id] ?? p.name,
+    }));
+  }
+
   private snapshotToGameState(snap: StateSnapshot): GameState {
     return {
       tick: snap.tick,
@@ -163,7 +172,7 @@ export class GameClient {
       kickoffCountdown: snap.kickoffCountdown,
       scoreRed: snap.scoreRed,
       scoreBlue: snap.scoreBlue,
-      players: snap.players,
+      players: this.applyNames(snap.players),
       ball: snap.ball,
       halfSwapped: snap.halfSwapped,
       lastSubstitutionTime: snap.lastSubstitutionTime,
@@ -195,7 +204,7 @@ export class GameClient {
       kickoffCountdown: to.kickoffCountdown,
       scoreRed: to.scoreRed,
       scoreBlue: to.scoreBlue,
-      players,
+      players: this.applyNames(players),
       ball,
       halfSwapped: to.halfSwapped,
       lastSubstitutionTime: to.lastSubstitutionTime,
