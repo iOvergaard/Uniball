@@ -32,33 +32,63 @@ const touchP2 = createTouchPlayer();
 const JOYSTICK_RADIUS = 50;
 const JOYSTICK_DEAD_ZONE = 8;
 
-export function initInput(): void {
-  // Keyboard
-  window.addEventListener('keydown', (e) => {
-    keys.add(e.code);
-  });
-  window.addEventListener('keyup', (e) => {
-    keys.delete(e.code);
-  });
-  window.addEventListener('blur', () => {
-    keys.clear();
-  });
+// Store references for cleanup
+let cleanupFn: (() => void) | null = null;
 
-  // Touch
+export function initInput(): void {
+  // Clean up previous listeners if any
+  if (cleanupFn) cleanupFn();
+
+  const onKeyDown = (e: KeyboardEvent) => keys.add(e.code);
+  const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
+  const onBlur = () => keys.clear();
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onBlur);
+
+  let touchCleanup: (() => void) | null = null;
   if ('ontouchstart' in window) {
-    initTouchControls();
+    touchCleanup = initTouchControls();
+  }
+
+  cleanupFn = () => {
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keyup', onKeyUp);
+    window.removeEventListener('blur', onBlur);
+    if (touchCleanup) touchCleanup();
+    keys.clear();
+  };
+}
+
+/** Remove all input listeners. */
+export function destroyInput(): void {
+  if (cleanupFn) {
+    cleanupFn();
+    cleanupFn = null;
   }
 }
 
-function initTouchControls(): void {
+function initTouchControls(): () => void {
   // Prevent default touch behaviors (scrolling, zooming)
-  document.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  const preventStart = (e: TouchEvent) => e.preventDefault();
+  const preventMove = (e: TouchEvent) => e.preventDefault();
+  document.addEventListener('touchstart', preventStart, { passive: false });
+  document.addEventListener('touchmove', preventMove, { passive: false });
 
   window.addEventListener('touchstart', handleTouchStart);
   window.addEventListener('touchmove', handleTouchMove);
   window.addEventListener('touchend', handleTouchEnd);
   window.addEventListener('touchcancel', handleTouchEnd);
+
+  return () => {
+    document.removeEventListener('touchstart', preventStart);
+    document.removeEventListener('touchmove', preventMove);
+    window.removeEventListener('touchstart', handleTouchStart);
+    window.removeEventListener('touchmove', handleTouchMove);
+    window.removeEventListener('touchend', handleTouchEnd);
+    window.removeEventListener('touchcancel', handleTouchEnd);
+  };
 }
 
 /**

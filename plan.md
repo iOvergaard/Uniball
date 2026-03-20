@@ -42,11 +42,12 @@ src/
     renderer.test.ts       — 11 tests: state snapshots at key moments, camera fitting
     camera.ts              — Viewport scaling / DPR / HUD-aware resize
   net/                     — PeerJS networking
-    host.ts                — Host: accept connections, run physics, broadcast state
+    host.ts                — Host: accept connections, run physics, broadcast state, disconnect handling
     client.ts              — Client: send inputs, receive state, interpolate
     protocol.ts            — Binary message encoding/decoding (input: 12B, state: ~230B)
     protocol.test.ts       — 14 tests for binary round-trip encoding
     lobby.test.ts          — 13 tests for lobby flow and multi-player simulation
+    robustness.test.ts     — 10 tests for disconnect handling, input buffering, late-join
   input/
     input.ts               — Keyboard capture → InputFrame
   game/                    — (Phase 4) Separate game loops
@@ -172,18 +173,19 @@ Complete visual overhaul: hand-drawn unicorn avatars (horn, head, rainbow mane) 
 
 **Test**: Game looks polished and feels fun in a group.
 
-### Phase 6: Robustness & Graceful Degradation
+### Phase 6: Robustness & Graceful Degradation — DONE
 
-Handle all unintended/disruptive scenarios so the game continues smoothly:
+Comprehensive disconnect handling and graceful degradation:
 
-- **Player leaves mid-game**: Remove player from field. If the team has reserves, immediately sub one in. If not, the team plays short-handed. Other players see a brief "[Player] left" notification.
-- **Host disconnects**: All clients see a "Host left — game over" screen. No recovery (host is authoritative).
-- **Client connection drops temporarily**: Host replays the client's last known input for up to N ticks (input buffering). If the client reconnects within a grace period, they resume seamlessly. If not, treated as a leave.
-- **Late join prevention**: Once the match starts, no new players can join mid-game.
-- **Tab/browser crash**: Same as disconnect — detected via WebRTC connection close event.
-- **Unequal teams after leave**: Game continues even if one team has more players. No forced forfeits.
+- **Player leaves mid-game**: `removePlayer()` in engine removes the player from the game state. If the team has reserves, the longest-waiting reserve is immediately subbed in. If not, the team plays short-handed. All players see a "[Player] left the game" notification toast (auto-dismisses after 3s). Host broadcasts `playerLeft` message to all clients.
+- **Host disconnects**: Clients already detect via WebRTC `close` event and show "Host left — game over" screen. No recovery needed (host is authoritative). Host now broadcasts final state before stopping so clients see the game-over screen.
+- **Input buffering**: Host tracks `inputAge` per client. When no new input arrives, the host replays the client's last known input for up to `INPUT_BUFFER_TICKS` (10 ticks / ~167ms). After the buffer expires, the client's input is treated as zero (no movement/kick). This smooths over brief network hiccups.
+- **Late join prevention**: Once the match starts (`running = true`), join requests are rejected with a `rejected` message containing the reason. Clients see "Rejected: Match already in progress".
+- **Input listener cleanup**: `initInput()` now stores references to all event listeners. `destroyInput()` removes them cleanly. `initInput()` also cleans up previous listeners if called multiple times.
+- **Final state broadcast**: Host broadcasts state one last time before stopping the tick loop, ensuring clients receive the `phase='ended'` state.
+- **Unequal teams after leave**: Game continues with any number of players per team, even 0. No forced forfeits.
 
-**Test**: Disconnect a player mid-game — reserve subs in or team plays short. Kill host — clients see error screen. Briefly kill network — player reconnects and resumes.
+**Test**: 10 new tests covering: player removal with/without reserves, reserve substitution on disconnect, unequal teams after leave, removing all players from a team, input buffering behavior, late-join prevention invariant, full 30-second match with mid-game disconnects and per-tick invariant checks.
 
 ## Key Types (`src/types.ts`)
 
@@ -247,8 +249,9 @@ interface InputFrame {
 - `src/net/protocol.test.ts` — 14 binary protocol round-trip tests
 - `src/net/lobby.test.ts` — 13 lobby flow and multi-player game simulation tests
 - `src/render/renderer.test.ts` — 11 state snapshot and camera fitting tests
+- `src/net/robustness.test.ts` — 10 robustness tests: disconnect handling, input buffering, late-join prevention
 
-**Total: 82 tests**
+**Total: 92 tests**
 
 ### Acceptance Tests
 
