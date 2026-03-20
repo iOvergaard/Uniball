@@ -3,7 +3,7 @@ import { createGameState, simulateTick } from './physics/engine';
 import { render } from './render/renderer';
 import { renderTouchOverlay } from './render/touch-overlay';
 import { resizeCanvas } from './render/camera';
-import { initInput, readInput } from './input/input';
+import { initInput, readInputP1, readInputP2 } from './input/input';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -15,7 +15,7 @@ window.addEventListener('resize', () => {
 
 initInput();
 
-// Create a local sandbox game: 1 red player vs 1 blue (dummy)
+// Create a local 2-player game: P1 (WASD+Space) = Red, P2 (Arrows+Enter) = Blue
 const state = createGameState(1, 1);
 
 // --- Fixed timestep game loop ---
@@ -28,9 +28,9 @@ function loop(now: number): void {
   accumulator += dt;
 
   while (accumulator >= TICK_DURATION) {
-    const input = readInput();
     const inputs = new Map<number, import('./types').InputFrame>();
-    inputs.set(0, input); // Player 0 = the local human player
+    inputs.set(0, readInputP1()); // Player 0 (Red) = WASD + Space
+    inputs.set(1, readInputP2()); // Player 1 (Blue) = Arrows + Enter
 
     simulateTick(state, inputs);
     accumulator -= TICK_DURATION;

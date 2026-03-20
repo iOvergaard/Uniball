@@ -147,11 +147,9 @@ We'll start with the emoji approach in Phase 1-4 and can upgrade to custom sprit
 
 Created Vite+TS project, physics engine, renderer, input handling. One player + ball on a field, controllable with WASD, ball bounces off walls. Migrated to Vite+ toolchain (Vite 8, Vitest, Oxlint, Oxfmt). Added GitHub Pages deploy workflow.
 
-### Phase 2: Full Local Match — IN PROGRESS
+### Phase 2: Full Local Match — DONE
 
-Added scoring, timer, kickoff countdown, halftime side swap, game-over logic. Implemented reserve player system with forced substitutions every 60 seconds (max 4 on field per team, up to 14 total players). HUD shows score, timer, and bench counts.
-
-**Remaining**: Second keyboard player (WASD vs arrows) for local 2-player testing.
+Added scoring, timer, kickoff countdown, halftime side swap, game-over logic. Implemented reserve player system with forced substitutions every 60 seconds (max 4 on field per team, up to 14 total players). HUD shows score, timer, and bench counts. Two-player local play: Player 1 (WASD + Space) controls Red, Player 2 (Arrow keys + Enter) controls Blue.
 
 **Test**: Play a full local match. Goals register, score updates, halftime swaps sides, substitutions rotate players, game ends.
 
