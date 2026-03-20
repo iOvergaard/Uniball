@@ -187,6 +187,16 @@ Comprehensive disconnect handling and graceful degradation:
 
 **Test**: 10 new tests covering: player removal with/without reserves, reserve substitution on disconnect, unequal teams after leave, removing all players from a team, input buffering behavior, late-join prevention invariant, full 30-second match with mid-game disconnects and per-tick invariant checks.
 
+### Phase 7: Gameplay & Polish Enhancements — DONE
+
+- **Sudden death overtime**: Tied regulation score triggers a 60-second overtime period with golden goal (first goal wins). If no goals in overtime, match ends as draw. `inOvertime` flag on GameState, renderer shows "SUDDEN DEATH" announcement and red "OT" timer prefix.
+- **Lobby chat**: Real-time text chat in both host and client lobbies. Chat messages relayed through host to all clients via `chat` LobbyMessage type. Chat box with scrollable message history and send button/Enter key.
+- **Sound effects**: Procedural Web Audio API sound effects — kick blip, goal whistle (ascending notes), kickoff whistle, countdown tick, game-over fanfare, ball bounce. M key toggles mute. No external audio files.
+- **Performance optimization**: Mutable Vec2 operations (`vec2AddMut`, `vec2ScaleMut`, `vec2ClampMut`) in physics hot loop to reduce GC pressure. Inline active player iteration. Reusable ball collision object.
+- **Custom unicorn sprites**: Pre-rendered unicorn sprites via offscreen canvas cache. Each player color gets a cached sprite with horn, head, ear, eye highlight, nostril, flowing rainbow mane, and team color ring. Blitted via `drawImage` instead of redrawing paths every frame.
+
+**Test**: 4 new tests covering: overtime on tied score, golden goal in overtime, draw after overtime expires, acceptance test for tied match entering sudden death.
+
 ## Key Types (`src/types.ts`)
 
 ```typescript
@@ -221,6 +231,7 @@ interface GameState {
   ball: BallState;
   halfSwapped: boolean;
   lastSubstitutionTime: number;
+  inOvertime: boolean;
 }
 interface InputFrame {
   dx: number;
@@ -237,6 +248,7 @@ interface InputFrame {
 4. **Phase 4**: Open 4+ tabs, join lobby, pick teams, start and play match with reserves
 5. **Phase 5**: Visual inspection — field lines, colors, animations, responsive scaling
 6. **Phase 6**: Close a tab mid-game, verify graceful handling
+7. **Phase 7**: Play a tied match → verify overtime triggers, chat in lobby, sounds on kick/goal, M to mute
 
 ## Testing Policy
 
@@ -244,14 +256,14 @@ interface InputFrame {
 
 ### Test Structure
 
-- `src/physics/engine.test.ts` — 27 unit tests for physics, collisions, scoring, timer, substitutions
-- `src/test/acceptance.test.ts` — 17 acceptance tests: full match simulations with bot players, invariant checks every tick
+- `src/physics/engine.test.ts` — 30 unit tests for physics, collisions, scoring, timer, substitutions, overtime
+- `src/test/acceptance.test.ts` — 18 acceptance tests: full match simulations with bot players, invariant checks every tick, overtime
 - `src/net/protocol.test.ts` — 14 binary protocol round-trip tests
 - `src/net/lobby.test.ts` — 13 lobby flow and multi-player game simulation tests
 - `src/render/renderer.test.ts` — 11 state snapshot and camera fitting tests
 - `src/net/robustness.test.ts` — 10 robustness tests: disconnect handling, input buffering, late-join prevention
 
-**Total: 92 tests**
+**Total: 96 tests**
 
 ### Acceptance Tests
 
@@ -262,7 +274,7 @@ Bot-driven full match simulations that exercise the entire engine end-to-end. Ea
 3. Asserts **invariants on every tick**: positions finite, players in bounds, team limits, non-negative scores/time
 4. Checks outcomes: match completes, goals scored, halftime triggers, substitutions rotate
 
-Current acceptance coverage (17 tests):
+Current acceptance coverage (18 tests):
 
 - Full match completion: 1v1, 3v3, 5v5 (with reserves), asymmetric teams
 - Goal scoring: attackers score at least 1 goal
@@ -271,6 +283,7 @@ Current acceptance coverage (17 tests):
 - Ball physics: velocity bounded, Y position in bounds
 - Player collisions: overlap rate below 5%
 - Edge cases: idle players, constant kicking, diagonal movement
+- Overtime: tied match enters sudden death, completes correctly
 
 ### Per-Phase Testing Requirements
 

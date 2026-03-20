@@ -13,8 +13,10 @@ import {
   updateLobbyPlayers,
   hideLobby,
   showLobbyStatus,
+  appendChatMessage,
 } from './ui/lobby-ui';
 import { showDisconnected, showGameOver, showNotification } from './ui/screens';
+import { setMuted, isMuted } from './audio/sfx';
 import type { GameState, InputFrame, LobbyPlayer, Team } from './types';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -26,6 +28,11 @@ window.addEventListener('resize', () => {
 });
 
 initInput();
+
+// M key toggles mute
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM') setMuted(!isMuted());
+});
 
 // --- Mode detection from URL hash ---
 // #room=<id>  → show landing with join pre-filled
@@ -103,6 +110,9 @@ function startHostMode(hostName: string): void {
         onStartGame: () => {
           host.startGame();
         },
+        onChat: (text: string) => {
+          host.sendChat(text);
+        },
       });
     },
     onPlayerJoin: (_player: LobbyPlayer) => {
@@ -119,6 +129,9 @@ function startHostMode(hostName: string): void {
       startHostGameLoop(host);
     },
     onTick: () => {},
+    onChat: (name: string, text: string) => {
+      appendChatMessage(name, text);
+    },
   });
 
   host.start().catch((err) => {
@@ -168,6 +181,9 @@ function startClientMode(playerName: string, hostPeerId: string): void {
           client.setTeam(team);
         },
         onStartGame: () => {},
+        onChat: (text: string) => {
+          client.sendChat(text);
+        },
       });
     },
     onPlayerList: (players: LobbyPlayer[]) => {
@@ -188,6 +204,9 @@ function startClientMode(playerName: string, hostPeerId: string): void {
     },
     onRejected: (reason: string) => {
       showLobbyStatus(`Rejected: ${reason}`);
+    },
+    onChat: (name: string, text: string) => {
+      appendChatMessage(name, text);
     },
   });
 

@@ -77,6 +77,7 @@ describe('Protocol: State messages', () => {
       scoreBlue: 2,
       halfSwapped: false,
       lastSubstitutionTime: 240,
+      inOvertime: false,
       players,
       ball: {
         position: { x: 420, y: 200 },
@@ -171,8 +172,8 @@ describe('Protocol: State messages', () => {
     for (const count of [0, 1, 4, 8, 14]) {
       const snapshot = makeSnapshot(count);
       const buf = encodeState(0, snapshot);
-      // Header(21) + playerCount(1) + ball(16) + players(24 each)
-      expect(buf.byteLength).toBe(21 + 1 + 16 + count * 24);
+      // Header(22) + playerCount(1) + ball(16) + players(24 each)
+      expect(buf.byteLength).toBe(22 + 1 + 16 + count * 24);
     }
   });
 });

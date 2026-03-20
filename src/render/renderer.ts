@@ -1,5 +1,7 @@
 import type { GameState, PlayerState } from '../types';
 import type { Camera } from './camera';
+import { playGoal, playWhistle, playCountdownTick, playGameOver, isMuted } from '../audio/sfx';
+import { drawUnicornSprite } from './unicorn-sprite';
 import {
   FIELD_WIDTH,
   FIELD_HEIGHT,
@@ -26,6 +28,8 @@ interface AnimState {
   prevPhase: string;
   prevHalfSwapped: boolean;
   prevLastSubTime: number;
+  prevInOvertime: boolean;
+  overtimeTimer: number;
   goalFlashTimer: number;
   goalFlashTeam: 'red' | 'blue' | null;
   halftimeTimer: number;
@@ -40,6 +44,8 @@ function freshAnim(): AnimState {
     prevPhase: '',
     prevHalfSwapped: false,
     prevLastSubTime: 0,
+    prevInOvertime: false,
+    overtimeTimer: 0,
     goalFlashTimer: 0,
     goalFlashTeam: null,
     halftimeTimer: 0,
@@ -67,6 +73,7 @@ function detectEvents(state: GameState): void {
     anim.prevPhase = state.phase;
     anim.prevHalfSwapped = state.halfSwapped;
     anim.prevLastSubTime = state.lastSubstitutionTime;
+    anim.prevInOvertime = state.inOvertime;
     anim.prevTick = state.tick;
     return;
   }
@@ -75,14 +82,23 @@ function detectEvents(state: GameState): void {
   if (state.scoreRed > anim.prevScoreRed) {
     anim.goalFlashTimer = GOAL_FLASH_DURATION;
     anim.goalFlashTeam = 'red';
+    playGoal();
   } else if (state.scoreBlue > anim.prevScoreBlue) {
     anim.goalFlashTimer = GOAL_FLASH_DURATION;
     anim.goalFlashTeam = 'blue';
+    playGoal();
   }
 
   // Halftime: detect via halfSwapped transitioning false→true
   if (state.halfSwapped && !anim.prevHalfSwapped) {
     anim.halftimeTimer = HALFTIME_DISPLAY_DURATION;
+    playWhistle();
+  }
+
+  // Overtime started
+  if (state.inOvertime && !anim.prevInOvertime) {
+    anim.overtimeTimer = HALFTIME_DISPLAY_DURATION;
+    playWhistle();
   }
 
   // Substitution happened
@@ -93,14 +109,30 @@ function detectEvents(state: GameState): void {
   anim.prevScoreRed = state.scoreRed;
   anim.prevScoreBlue = state.scoreBlue;
   anim.prevPhase = state.phase;
+  // Game over
+  if (state.phase === 'ended' && anim.prevPhase !== 'ended') {
+    playGameOver();
+  }
+
+  // Countdown tick (once per second during kickoff)
+  if (state.phase === 'kickoff' && state.kickoffCountdown > 0) {
+    const prevSec = Math.ceil((state.kickoffCountdown + 1) / 60);
+    const curSec = Math.ceil(state.kickoffCountdown / 60);
+    if (curSec < prevSec) {
+      playCountdownTick();
+    }
+  }
+
   anim.prevHalfSwapped = state.halfSwapped;
   anim.prevLastSubTime = state.lastSubstitutionTime;
+  anim.prevInOvertime = state.inOvertime;
   anim.prevTick = state.tick;
 }
 
 function tickAnimations(): void {
   if (anim.goalFlashTimer > 0) anim.goalFlashTimer--;
   if (anim.halftimeTimer > 0) anim.halftimeTimer--;
+  if (anim.overtimeTimer > 0) anim.overtimeTimer--;
   if (anim.subAnnouncementTimer > 0) anim.subAnnouncementTimer--;
 }
 
@@ -357,8 +389,12 @@ function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState, _state: 
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Draw unicorn (rotated to face movement direction)
-  drawUnicorn(ctx, player);
+  // Draw unicorn sprite (rotated to face movement direction)
+  const vx = player.velocity.x;
+  const vy = player.velocity.y;
+  const speed = Math.sqrt(vx * vx + vy * vy);
+  const angle = speed > 0.1 ? Math.atan2(vy, vx) : 0;
+  drawUnicornSprite(ctx, x, y, angle, color, lightColor);
 
   // Player name with background
   const name = player.name || `P${player.id}`;
@@ -392,61 +428,7 @@ function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState, _state: 
   }
 }
 
-function drawUnicorn(ctx: CanvasRenderingContext2D, player: PlayerState): void {
-  const x = player.position.x;
-  const y = player.position.y;
-
-  // Facing direction from velocity
-  const vx = player.velocity.x;
-  const vy = player.velocity.y;
-  const speed = Math.sqrt(vx * vx + vy * vy);
-  const angle = speed > 0.1 ? Math.atan2(vy, vx) : 0;
-
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-
-  const r = PLAYER_RADIUS * 0.6;
-
-  // Horn (pointing forward = right in local coords)
-  ctx.fillStyle = '#ffd700';
-  ctx.beginPath();
-  ctx.moveTo(r + 5, 0);
-  ctx.lineTo(r - 2, -3);
-  ctx.lineTo(r - 2, 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#daa520';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-
-  // Head
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eye
-  ctx.fillStyle = '#333';
-  ctx.beginPath();
-  ctx.arc(r * 0.3, -r * 0.25, 1.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Mane (rainbow hair trailing behind)
-  const maneColors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff'];
-  for (let i = 0; i < maneColors.length; i++) {
-    ctx.strokeStyle = maneColors[i];
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    const startX = -r * 0.3;
-    const startY = -r * 0.5 - i * 1.5;
-    ctx.moveTo(startX, startY);
-    ctx.quadraticCurveTo(startX - r * 0.5, startY - 2 + i * 1, startX - r, startY + i * 2);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
+// drawUnicorn is now handled by unicorn-sprite.ts (pre-rendered offscreen canvas)
 
 // === Goal flash ===
 
@@ -537,13 +519,22 @@ function drawHUD(ctx: CanvasRenderingContext2D, state: GameState): void {
   // Timer
   const minutes = Math.floor(state.matchTime / 60);
   const seconds = Math.floor(state.matchTime % 60);
-  const timerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const timerText = `${state.inOvertime ? 'OT ' : ''}${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   ctx.font = 'bold 14px sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.fillStyle = state.inOvertime ? '#ff6b6b' : 'rgba(255, 255, 255, 0.8)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(timerText, FIELD_WIDTH / 2, FIELD_HEIGHT + 6);
+
+  // Mute indicator
+  if (isMuted()) {
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText('MUTED', FIELD_WIDTH - 4, -36);
+  }
 
   // Bench indicators
   const redReserves = state.players.filter((p) => p.team === 'red' && !p.onField).length;
@@ -616,6 +607,25 @@ function drawOverlays(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.fillStyle = '#feca57';
     ctx.globalAlpha = Math.min(t * 2, 1);
     ctx.fillText('HALFTIME', FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
+    ctx.globalAlpha = 1;
+  }
+
+  // Overtime announcement
+  if (anim.overtimeTimer > 0) {
+    const t = anim.overtimeTimer / HALFTIME_DISPLAY_DURATION;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.globalAlpha = Math.min(t * 2, 1);
+    ctx.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
+    ctx.globalAlpha = 1;
+
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillText('SUDDEN DEATH', FIELD_WIDTH / 2 + 2, FIELD_HEIGHT / 2 + 2);
+    ctx.fillStyle = '#ff6b6b';
+    ctx.globalAlpha = Math.min(t * 2, 1);
+    ctx.fillText('SUDDEN DEATH', FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
     ctx.globalAlpha = 1;
   }
 

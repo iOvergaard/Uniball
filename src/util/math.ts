@@ -41,3 +41,35 @@ export function vec2Lerp(a: Vec2, b: Vec2, t: number): Vec2 {
 export function vec2Clone(v: Vec2): Vec2 {
   return { x: v.x, y: v.y };
 }
+
+// --- Mutable variants (reduce allocations in hot loops) ---
+
+/** a += b (mutates a) */
+export function vec2AddMut(a: Vec2, b: Vec2): void {
+  a.x += b.x;
+  a.y += b.y;
+}
+
+/** v *= s (mutates v) */
+export function vec2ScaleMut(v: Vec2, s: number): void {
+  v.x *= s;
+  v.y *= s;
+}
+
+/** Set v to its normalized form (mutates v). Returns length. */
+export function vec2NormalizeMut(v: Vec2): number {
+  const len = Math.sqrt(v.x * v.x + v.y * v.y);
+  if (len === 0) return 0;
+  v.x /= len;
+  v.y /= len;
+  return len;
+}
+
+/** Clamp v's magnitude to max (mutates v) */
+export function vec2ClampMut(v: Vec2, max: number): void {
+  const len = Math.sqrt(v.x * v.x + v.y * v.y);
+  if (len > max) {
+    v.x = (v.x / len) * max;
+    v.y = (v.y / len) * max;
+  }
+}

@@ -35,6 +35,7 @@ export interface GameState {
   ball: BallState;
   halfSwapped: boolean;
   lastSubstitutionTime: number;
+  inOvertime: boolean;
 }
 
 export interface InputFrame {
@@ -55,6 +56,7 @@ export interface StateSnapshot {
   scoreBlue: number;
   halfSwapped: boolean;
   lastSubstitutionTime: number;
+  inOvertime: boolean;
   players: PlayerState[];
   ball: BallState;
   timestamp: number;
@@ -75,4 +77,5 @@ export type LobbyMessage =
   | { type: 'start'; playerNames: Record<number, string> }
   | { type: 'playerList'; players: LobbyPlayer[] }
   | { type: 'playerLeft'; playerName: string }
-  | { type: 'rejected'; reason: string };
+  | { type: 'rejected'; reason: string }
+  | { type: 'chat'; name: string; text: string };

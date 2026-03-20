@@ -19,6 +19,7 @@ export interface HostCallbacks {
   onPlayerDisconnect: (playerName: string) => void;
   onGameStart: (state: GameState) => void;
   onTick: (state: GameState) => void;
+  onChat?: (name: string, text: string) => void;
 }
 
 interface ConnectedClient {
@@ -67,6 +68,14 @@ export class GameHost {
 
   setHostName(name: string): void {
     this.hostName = name;
+  }
+
+  sendChat(text: string): void {
+    const chatMsg: LobbyMessage = { type: 'chat', name: this.hostName, text };
+    for (const c of this.clients.values()) {
+      c.conn.send(chatMsg);
+    }
+    this.callbacks.onChat?.(this.hostName, text);
   }
 
   setHostInput(input: InputFrame): void {
@@ -162,6 +171,18 @@ export class GameHost {
         if (client) {
           client.team = msg.team;
           this.broadcastPlayerList();
+        }
+        break;
+      }
+      case 'chat': {
+        const client = this.clients.get(conn.peer);
+        if (client) {
+          // Relay to all clients (including sender)
+          const chatMsg: LobbyMessage = { type: 'chat', name: client.name, text: msg.text };
+          for (const c of this.clients.values()) {
+            c.conn.send(chatMsg);
+          }
+          this.callbacks.onChat?.(client.name, msg.text);
         }
         break;
       }
@@ -294,6 +315,7 @@ export class GameHost {
       scoreBlue: this.state.scoreBlue,
       halfSwapped: this.state.halfSwapped,
       lastSubstitutionTime: this.state.lastSubstitutionTime,
+      inOvertime: this.state.inOvertime,
       players: this.state.players,
       ball: this.state.ball,
       timestamp: performance.now(),
