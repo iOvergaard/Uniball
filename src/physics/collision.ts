@@ -1,5 +1,5 @@
 import { Vec2 } from '../types';
-import { vec2Sub, vec2Dist, vec2Normalize, vec2Dot, vec2Scale, vec2Add } from '../util/math';
+import { vec2Sub, vec2Dist, vec2Normalize, vec2Dot, vec2Scale } from '../util/math';
 
 interface Circle {
   position: Vec2;
@@ -8,7 +8,7 @@ interface Circle {
   mass: number;
 }
 
-/** Resolve overlap and exchange velocity between two circles (elastic collision). */
+/** Resolve overlap and exchange velocity between two circles (elastic collision). Mutates in place. */
 export function resolveCircleCircle(a: Circle, b: Circle): void {
   const diff = vec2Sub(a.position, b.position);
   const dist = vec2Dist(a.position, b.position);
@@ -19,10 +19,14 @@ export function resolveCircleCircle(a: Circle, b: Circle): void {
   const normal = vec2Normalize(diff);
   const overlap = minDist - dist;
 
-  // Separate by inverse mass ratio
+  // Separate by inverse mass ratio (mutate in place)
   const totalMass = a.mass + b.mass;
-  a.position = vec2Add(a.position, vec2Scale(normal, overlap * (b.mass / totalMass)));
-  b.position = vec2Add(b.position, vec2Scale(normal, -overlap * (a.mass / totalMass)));
+  const sepA = vec2Scale(normal, overlap * (b.mass / totalMass));
+  const sepB = vec2Scale(normal, -overlap * (a.mass / totalMass));
+  a.position.x += sepA.x;
+  a.position.y += sepA.y;
+  b.position.x += sepB.x;
+  b.position.y += sepB.y;
 
   // Exchange velocity along collision normal
   const relVel = vec2Sub(a.velocity, b.velocity);
@@ -32,8 +36,12 @@ export function resolveCircleCircle(a: Circle, b: Circle): void {
   if (velAlongNormal > 0) return;
 
   const impulse = (-2 * velAlongNormal) / totalMass;
-  a.velocity = vec2Add(a.velocity, vec2Scale(normal, impulse * b.mass));
-  b.velocity = vec2Add(b.velocity, vec2Scale(normal, -impulse * a.mass));
+  const impA = vec2Scale(normal, impulse * b.mass);
+  const impB = vec2Scale(normal, -impulse * a.mass);
+  a.velocity.x += impA.x;
+  a.velocity.y += impA.y;
+  b.velocity.x += impB.x;
+  b.velocity.y += impB.y;
 }
 
 /** Constrain a circle inside a rectangular boundary, reflecting velocity on bounce. */
