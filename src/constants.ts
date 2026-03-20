@@ -41,6 +41,20 @@ export const MATCH_DURATION_SECONDS = 300; // 5 minutes
 export const HALFTIME_SECONDS = MATCH_DURATION_SECONDS / 2;
 export const KICKOFF_COUNTDOWN_TICKS = 180; // 3 seconds
 
+// === Networking ===
+export const STATE_BROADCAST_RATE = 20; // Hz — host broadcasts state snapshots
+export const STATE_BROADCAST_INTERVAL = 1000 / STATE_BROADCAST_RATE;
+export const INTERPOLATION_BUFFER_MS = 50; // Client render delay for smooth interpolation
+
+// === Protocol message types ===
+export const MSG_INPUT = 1;
+export const MSG_STATE = 2;
+export const MSG_LOBBY_JOIN = 10;
+export const MSG_LOBBY_TEAM = 11;
+export const MSG_LOBBY_START = 12;
+export const MSG_LOBBY_WELCOME = 13;
+export const MSG_LOBBY_PLAYER_LIST = 14;
+
 // === Rendering ===
 export const CANVAS_PADDING = 40;
 
