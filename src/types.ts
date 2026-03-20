@@ -13,6 +13,8 @@ export interface PlayerState {
   kickCooldown: number;
   name: string;
   onField: boolean;
+  /** Tick when this player was last benched (0 = started on bench). Used for fair rotation. */
+  benchedAtTick: number;
 }
 
 export interface BallState {

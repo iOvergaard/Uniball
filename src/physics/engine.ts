@@ -41,6 +41,7 @@ export function createGameState(redCount: number, blueCount: number): GameState 
       kickCooldown: 0,
       name: `Red ${i + 1}`,
       onField: i < MAX_ON_FIELD_PER_TEAM,
+      benchedAtTick: 0,
     });
   }
   for (let i = 0; i < blueCount; i++) {
@@ -52,6 +53,7 @@ export function createGameState(redCount: number, blueCount: number): GameState 
       kickCooldown: 0,
       name: `Blue ${i + 1}`,
       onField: i < MAX_ON_FIELD_PER_TEAM,
+      benchedAtTick: 0,
     });
   }
 
@@ -72,14 +74,18 @@ export function createGameState(redCount: number, blueCount: number): GameState 
   return state;
 }
 
-/** Perform forced substitution for a team: rotate oldest on-field player to bench, bring in next reserve. */
-function substituteTeam(players: PlayerState[], team: 'red' | 'blue'): void {
+/** Perform forced substitution for a team: bench the longest-on-field player, bring in longest-waiting reserve. */
+function substituteTeam(players: PlayerState[], team: 'red' | 'blue', tick: number): void {
   const onField = players.filter((p) => p.team === team && p.onField);
   const reserves = players.filter((p) => p.team === team && !p.onField);
   if (reserves.length === 0) return;
 
-  // Rotate: first on-field player goes to bench, first reserve comes on
+  // Pick longest-waiting reserve (lowest benchedAtTick = been waiting longest)
+  reserves.sort((a, b) => a.benchedAtTick - b.benchedAtTick);
+
+  // Bench the first on-field player, bring in longest-waiting reserve
   onField[0].onField = false;
+  onField[0].benchedAtTick = tick;
   reserves[0].onField = true;
 }
 
@@ -122,8 +128,8 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   // --- Forced substitutions every SUBSTITUTION_INTERVAL_SECONDS ---
   const elapsed = state.lastSubstitutionTime - state.matchTime;
   if (elapsed >= SUBSTITUTION_INTERVAL_SECONDS) {
-    substituteTeam(state.players, 'red');
-    substituteTeam(state.players, 'blue');
+    substituteTeam(state.players, 'red', state.tick);
+    substituteTeam(state.players, 'blue', state.tick);
     state.lastSubstitutionTime = state.matchTime;
     resetPlayersToPositions(state.players, state.halfSwapped);
   }
