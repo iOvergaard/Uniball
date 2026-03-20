@@ -1,19 +1,22 @@
 import { GameState } from '../types';
 import { Camera } from './camera';
 import {
-  FIELD_WIDTH, FIELD_HEIGHT,
-  GOAL_HEIGHT, GOAL_WIDTH, GOAL_Y_MIN,
+  FIELD_WIDTH,
+  FIELD_HEIGHT,
+  GOAL_HEIGHT,
+  GOAL_WIDTH,
+  GOAL_Y_MIN,
   CENTER_CIRCLE_RADIUS,
-  PLAYER_RADIUS, BALL_RADIUS,
-  RED_TEAM_COLOR, BLUE_TEAM_COLOR,
-  FIELD_COLOR, FIELD_LINE_COLOR, BALL_COLOR,
+  PLAYER_RADIUS,
+  BALL_RADIUS,
+  RED_TEAM_COLOR,
+  BLUE_TEAM_COLOR,
+  FIELD_COLOR,
+  FIELD_LINE_COLOR,
+  BALL_COLOR,
 } from '../constants';
 
-export function render(
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  camera: Camera,
-): void {
+export function render(ctx: CanvasRenderingContext2D, state: GameState, camera: Camera): void {
   const { scale, offsetX, offsetY } = camera;
 
   // Clear
@@ -181,9 +184,12 @@ function drawHUD(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const winner = state.scoreRed > state.scoreBlue ? 'Red Wins!'
-      : state.scoreBlue > state.scoreRed ? 'Blue Wins!'
-      : 'Draw!';
+    const winner =
+      state.scoreRed > state.scoreBlue
+        ? 'Red Wins!'
+        : state.scoreBlue > state.scoreRed
+          ? 'Blue Wins!'
+          : 'Draw!';
     ctx.fillText(winner, FIELD_WIDTH / 2, FIELD_HEIGHT / 2);
   }
 }

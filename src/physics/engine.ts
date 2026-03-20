@@ -1,13 +1,26 @@
 import { GameState, InputFrame } from '../types';
 import {
-  FIELD_WIDTH, FIELD_HEIGHT,
-  PLAYER_RADIUS, PLAYER_MASS, PLAYER_DAMPING, PLAYER_ACCEL, MAX_PLAYER_SPEED,
-  BALL_RADIUS, BALL_MASS, BALL_DAMPING,
-  KICK_RANGE, KICK_FORCE, KICK_COOLDOWN_TICKS,
-  WALL_RESTITUTION_PLAYER, WALL_RESTITUTION_BALL,
-  GOAL_Y_MIN, GOAL_Y_MAX,
-  MATCH_DURATION_SECONDS, HALFTIME_SECONDS,
-  KICKOFF_COUNTDOWN_TICKS, TICK_RATE,
+  FIELD_WIDTH,
+  FIELD_HEIGHT,
+  PLAYER_RADIUS,
+  PLAYER_MASS,
+  PLAYER_DAMPING,
+  PLAYER_ACCEL,
+  MAX_PLAYER_SPEED,
+  BALL_RADIUS,
+  BALL_MASS,
+  BALL_DAMPING,
+  KICK_RANGE,
+  KICK_FORCE,
+  KICK_COOLDOWN_TICKS,
+  WALL_RESTITUTION_PLAYER,
+  WALL_RESTITUTION_BALL,
+  GOAL_Y_MIN,
+  GOAL_Y_MAX,
+  MATCH_DURATION_SECONDS,
+  HALFTIME_SECONDS,
+  KICKOFF_COUNTDOWN_TICKS,
+  TICK_RATE,
 } from '../constants';
 import { vec2, vec2Add, vec2Scale, vec2Normalize, vec2Sub, vec2Length } from '../util/math';
 import { resolveCircleCircle, resolveCircleWall } from './collision';
@@ -132,8 +145,18 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   // --- Player-ball collision ---
   for (const player of state.players) {
     resolveCircleCircle(
-      { position: player.position, velocity: player.velocity, radius: PLAYER_RADIUS, mass: PLAYER_MASS },
-      { position: state.ball.position, velocity: state.ball.velocity, radius: BALL_RADIUS, mass: BALL_MASS },
+      {
+        position: player.position,
+        velocity: player.velocity,
+        radius: PLAYER_RADIUS,
+        mass: PLAYER_MASS,
+      },
+      {
+        position: state.ball.position,
+        velocity: state.ball.velocity,
+        radius: BALL_RADIUS,
+        mass: BALL_MASS,
+      },
     );
   }
 
@@ -152,15 +175,27 @@ export function simulateTick(state: GameState, inputs: Map<number, InputFrame>):
   // --- Wall collisions ---
   for (const player of state.players) {
     resolveCircleWall(
-      player.position, player.velocity, PLAYER_RADIUS,
-      FIELD_WIDTH, FIELD_HEIGHT, WALL_RESTITUTION_PLAYER,
-      GOAL_Y_MIN, GOAL_Y_MAX, false,
+      player.position,
+      player.velocity,
+      PLAYER_RADIUS,
+      FIELD_WIDTH,
+      FIELD_HEIGHT,
+      WALL_RESTITUTION_PLAYER,
+      GOAL_Y_MIN,
+      GOAL_Y_MAX,
+      false,
     );
   }
   resolveCircleWall(
-    state.ball.position, state.ball.velocity, BALL_RADIUS,
-    FIELD_WIDTH, FIELD_HEIGHT, WALL_RESTITUTION_BALL,
-    GOAL_Y_MIN, GOAL_Y_MAX, true,
+    state.ball.position,
+    state.ball.velocity,
+    BALL_RADIUS,
+    FIELD_WIDTH,
+    FIELD_HEIGHT,
+    WALL_RESTITUTION_BALL,
+    GOAL_Y_MIN,
+    GOAL_Y_MAX,
+    true,
   );
 
   // --- Goal detection ---
