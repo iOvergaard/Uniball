@@ -38,8 +38,9 @@ src/
     collision.ts           — Circle-circle and circle-wall resolution
     field.ts               — Field geometry, goal detection, player positioning
   render/
-    renderer.ts            — Canvas 2D drawing (field, players, ball, HUD, bench counts)
-    camera.ts              — Viewport scaling / resize handling
+    renderer.ts            — Canvas 2D drawing (field, unicorns, ball, HUD, animations, overlays)
+    renderer.test.ts       — 11 tests: state snapshots at key moments, camera fitting
+    camera.ts              — Viewport scaling / DPR / HUD-aware resize
   net/                     — PeerJS networking
     host.ts                — Host: accept connections, run physics, broadcast state
     client.ts              — Client: send inputs, receive state, interpolate
@@ -165,9 +166,9 @@ Full lobby UI: landing screen (create/join/local), host lobby with shareable lin
 
 **Test**: Multiple tabs join room, pick teams, host starts game, everyone plays together. Substitutions rotate reserves in.
 
-### Phase 5: Visual Polish
+### Phase 5: Visual Polish — DONE
 
-Unicorn avatar upgrades (custom SVG sprites with team colors, rotation to face movement direction, kick animation), field lines, player names above unicorns, goal flash animation, kick indicator, responsive canvas scaling, kickoff countdown overlay, halftime overlay, substitution announcement.
+Complete visual overhaul: hand-drawn unicorn avatars (horn, head, rainbow mane) rotated to face movement direction with unique color shades per player. Kick expanding ring animation + cooldown bar + kick range indicator. Goal flash with "GOAL!" text and team color overlay. Improved kickoff countdown with pulsing effect and dim overlay. Halftime announcement ("HALFTIME" in gold). Substitution announcement. Polished field with grass stripes, penalty areas, corner arcs, net pattern goals. Gradient player circles and ball with soccer pentagon pattern and speed glow. Player name labels with rounded background. Game-over screen with winner color and final score. Responsive camera with DPR support and HUD margin accounting. 11 new snapshot/camera tests (82 total).
 
 **Test**: Game looks polished and feels fun in a group.
 
