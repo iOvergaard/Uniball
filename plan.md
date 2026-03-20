@@ -34,20 +34,21 @@ src/
   types.ts                 — Shared type definitions
   physics/
     engine.ts              — Fixed-timestep simulation, substitution logic
-    engine.test.ts         — Vitest test suite (22 tests)
+    engine.test.ts         — Vitest test suite (27 unit tests)
     collision.ts           — Circle-circle and circle-wall resolution
     field.ts               — Field geometry, goal detection, player positioning
   render/
     renderer.ts            — Canvas 2D drawing (field, players, ball, HUD, bench counts)
     camera.ts              — Viewport scaling / resize handling
-  net/                     — (Phase 3) PeerJS networking
-    host.ts                — Host: accept connections, broadcast state
+  net/                     — PeerJS networking
+    host.ts                — Host: accept connections, run physics, broadcast state
     client.ts              — Client: send inputs, receive state, interpolate
-    protocol.ts            — Binary message encoding/decoding
-    lobby.ts               — Room creation, join flow, team selection
+    protocol.ts            — Binary message encoding/decoding (input: 12B, state: ~230B)
+    protocol.test.ts       — 14 tests for binary round-trip encoding
+    lobby.ts               — (Phase 4) Room creation, join flow, team selection
   input/
     input.ts               — Keyboard capture → InputFrame
-  game/                    — (Phase 2-3) Separate game loops
+  game/                    — (Phase 4) Separate game loops
     game-host.ts           — Host game loop: tick physics + broadcast
     game-client.ts         — Client game loop: send inputs + interpolate + render
     rules.ts               — Kickoff, halftime, goals, game-over logic
@@ -87,8 +88,8 @@ This avoids cross-browser floating-point determinism issues that plague lockstep
 | Field | Type | Bytes |
 |-------|------|-------|
 | Header (type, seq, tick, time, scores) | mixed | 13 |
-| Per player (pos, vel, team, cooldown, id, onField) | mixed | 21 each |
-| **Total (8 on-field)** | | **~181** |
+| Per player (id, team, onField, benchedAtTick, cooldown, pos, vel) | mixed | 24 each |
+| **Total (8 on-field)** | | **~230** |
 
 Bandwidth: ~3.6 KB/s per client. Negligible.
 
@@ -108,7 +109,7 @@ All entities are circles. Top-down, no gravity, friction via damping.
 - Up to **14 players** total (7 per team max), **4 on field per team** at a time
 - Teams can be unequal in size (e.g. 7 red vs 3 blue)
 - Every **60 seconds**, each team with reserves performs a forced substitution
-- Rotation is FIFO: the first on-field player goes to bench, the first reserve comes on
+- Rotation is FIFO: the first on-field player goes to bench, the longest-waiting reserve comes on (tracked via `benchedAtTick`)
 - After substitution, all on-field players reset to starting positions
 
 ### Player Avatars — Unicorns!
@@ -153,9 +154,9 @@ Added scoring, timer, kickoff countdown, halftime side swap, game-over logic. Im
 
 **Test**: Play a full local match. Goals register, score updates, halftime swaps sides, substitutions rotate players, game ends.
 
-### Phase 3: Networking — Host + One Client
+### Phase 3: Networking — Host + One Client — DONE
 
-PeerJS integration. Host runs physics, client sends input and receives state. Binary protocol. Client-side interpolation.
+PeerJS integration. Host runs physics at 60 Hz, broadcasts state snapshots at 20 Hz via binary protocol. Client sends input (12 bytes) and interpolates between snapshots for smooth 60fps rendering. Mode detection via URL hash: `#host` creates room, `#room=<id>` joins as client, no hash = local 2-player mode.
 
 **Test**: Two browser tabs connected. Both players move, kick ball. Physics authoritative on host tab.
 
@@ -200,6 +201,7 @@ interface PlayerState {
   kickCooldown: number;
   name: string;
   onField: boolean;
+  benchedAtTick: number;
 }
 interface BallState {
   position: Vec2;
@@ -240,8 +242,8 @@ interface InputFrame {
 
 ### Test Structure
 
-- `src/physics/engine.test.ts` — Unit tests for physics, collisions, scoring, timer, substitutions
-- `src/test/acceptance.test.ts` — Full match simulations with bot players, invariant checks every tick
+- `src/physics/engine.test.ts` — 27 unit tests for physics, collisions, scoring, timer, substitutions
+- `src/test/acceptance.test.ts` — 17 acceptance tests: full match simulations with bot players, invariant checks every tick
 
 ### Acceptance Tests
 
@@ -252,12 +254,12 @@ Bot-driven full match simulations that exercise the entire engine end-to-end. Ea
 3. Asserts **invariants on every tick**: positions finite, players in bounds, team limits, non-negative scores/time
 4. Checks outcomes: match completes, goals scored, halftime triggers, substitutions rotate
 
-Current acceptance coverage:
+Current acceptance coverage (17 tests):
 
 - Full match completion: 1v1, 3v3, 5v5 (with reserves), asymmetric teams
 - Goal scoring: attackers score at least 1 goal
 - Halftime: triggers once, swaps sides
-- Substitutions: reserves rotate onto field after interval
+- Substitutions: reserves rotate onto field after interval, fair rotation (all reserves get field time)
 - Ball physics: velocity bounded, Y position in bounds
 - Player collisions: overlap rate below 5%
 - Edge cases: idle players, constant kicking, diagonal movement

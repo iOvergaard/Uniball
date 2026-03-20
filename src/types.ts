@@ -42,3 +42,35 @@ export interface InputFrame {
   dy: number;
   kick: boolean;
 }
+
+// === Networking types ===
+
+/** Compact state snapshot sent from host to clients at 20 Hz */
+export interface StateSnapshot {
+  tick: number;
+  matchTime: number;
+  phase: MatchPhase;
+  kickoffCountdown: number;
+  scoreRed: number;
+  scoreBlue: number;
+  halfSwapped: boolean;
+  lastSubstitutionTime: number;
+  players: PlayerState[];
+  ball: BallState;
+  timestamp: number;
+}
+
+/** Lobby player info shared between host and clients */
+export interface LobbyPlayer {
+  id: number;
+  name: string;
+  team: Team;
+}
+
+/** Lobby message types (sent as JSON over reliable DataChannel) */
+export type LobbyMessage =
+  | { type: 'join'; name: string }
+  | { type: 'welcome'; playerId: number }
+  | { type: 'team'; team: Team }
+  | { type: 'start' }
+  | { type: 'playerList'; players: LobbyPlayer[] };
